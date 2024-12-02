@@ -1,6 +1,6 @@
 import server
 import numpy as np
-from unflatten import Info, unserialize
+from unflatten import Info, unflatten
 
 class InferenceServerHandler(server.ServerHandler):
   def request_handler(self, request):
@@ -8,7 +8,7 @@ class InferenceServerHandler(server.ServerHandler):
     data = request['data']
     data = np.frombuffer(request['data'], dtype=np.float32)
 
-    image_data, packages_data = unserialize(data)
+    image_data, packages_data = unflatten(data)
 
     result = np.zeros(Info.action_count + 1, dtype=np.float32)
     result[:-1] = 1.0 / Info.action_count
