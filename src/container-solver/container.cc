@@ -59,6 +59,35 @@ float Container::reward() const noexcept {
   return packing_efficiency;
 }
 
+auto Container::flatten() const noexcept -> std::vector<float> {
+  size_t height_map_size = m_height_map.data().size();
+  size_t values_per_packages = 4;
+  size_t packages_size = values_per_packages * m_packages.size();
+
+  std::vector<float> data;
+  data.reserve(height_map_size + packages_size);
+  for (int x = 0; x < m_height_map.nr_rows(); ++x) {
+    for (int y = 0; y < m_height_map.nr_cols(); ++y) {
+      data.push_back(static_cast<float>(m_height_map[x, y]) / m_height);
+    }
+  }
+
+  for (const auto& pkg : m_packages) {
+    if (pkg.is_placed) {
+      for (int i = 0; i < values_per_packages; ++i) {
+        data.push_back(0.0f);
+      }
+    } else {
+      data.push_back(pkg.shape.x);
+      data.push_back(pkg.shape.y);
+      data.push_back(pkg.shape.z);
+      data.push_back(pkg.cost);
+    }
+  }
+
+  return data;
+}
+
 template <typename T>
 auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<std::pair<T, int>> {
   std::size_t n_arr = arr.nr_rows(), m_arr = arr.nr_cols();

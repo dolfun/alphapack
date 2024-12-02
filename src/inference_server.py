@@ -1,13 +1,20 @@
 import server
 import numpy as np
+from unflatten import Info, unserialize
 
 class InferenceServerHandler(server.ServerHandler):
   def request_handler(self, request):
     assert(request['type'].decode('ascii') == 'inference')
     data = request['data']
-    data = np.frombuffer(request['data'], dtype=np.float32).copy()
-    data *= 2.0
-    return data.tobytes()
+    data = np.frombuffer(request['data'], dtype=np.float32)
+
+    image_data, packages_data = unserialize(data)
+
+    result = np.zeros(Info.action_count + 1, dtype=np.float32)
+    result[:-1] = 1.0 / Info.action_count
+    result[-1] = 0.5
+
+    return result.tobytes()
 
 def run():
   server.run(handler=InferenceServerHandler)

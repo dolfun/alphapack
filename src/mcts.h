@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <memory>
+#include <future>
 #include <cassert>
 #include <utility>
 #include <algorithm>
@@ -11,7 +12,8 @@ concept StateConcept = requires(State& state, int action_idx) {
   { State::action_count } -> std::convertible_to<size_t>;
   { std::as_const(state).possible_actions() } -> std::same_as<std::vector<int>>;
   { state.transition(action_idx) } -> std::same_as<void>;
-  { state.reward() } -> std::same_as<float>;
+  { std::as_const(state).reward() } -> std::same_as<float>;
+  { std::as_const(state).flatten() } -> std::same_as<std::vector<float>>;
 };
 
 template <typename F, typename State>
@@ -57,21 +59,30 @@ void run_mcts_simulation(NodePtr<State> node, StateEvaluator&& evaluator) {
   }
 
   // Evaluation
-  auto [priors, value] = evaluator(node->state);
+  auto evaluator_result = std::async(
+    std::launch::async,
+    std::forward<StateEvaluator>(evaluator),
+    node->state
+  );
 
   // Expansion
   auto actions = node->state.possible_actions();
+  for (auto action_idx : actions) {
+    auto child = std::make_shared<Node<State>>(node->state);
+    child->action_idx = action_idx;
+    child->state.transition(action_idx);
+    node->children.push_back(child);
+  }
+
+  // Evlauation update
+  auto [priors, value] = evaluator_result.get();
   float total_valid_prior = 0.0f;
   for (auto action_idx : actions) {
     total_valid_prior += priors[action_idx];
   }
 
-  for (auto action_idx : actions) {
-    auto child = std::make_shared<Node<State>>(node->state);
-    child->action_idx = action_idx;
-    child->state.transition(action_idx);
-    child->prior = priors[action_idx] / total_valid_prior;
-    node->children.push_back(child);
+  for (auto child : node->children) {
+    child->prior = priors[child->action_idx] / total_valid_prior;
   }
 
   // Backpropagation

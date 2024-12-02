@@ -12,6 +12,7 @@ public:
   auto possible_actions() const -> std::vector<int>;
   void transition(int);
   float reward() const noexcept;
+  auto flatten() const noexcept -> std::vector<float>;
 
   static constexpr size_t action_count = 32;
   static constexpr int length = 16;
