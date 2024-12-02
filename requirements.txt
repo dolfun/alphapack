@@ -3,3 +3,4 @@ pandas
 matplotlib
 plotly
 ipykernel
+requests-toolbelt
