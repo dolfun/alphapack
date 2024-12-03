@@ -1,10 +1,11 @@
 #pragma once
 #include "package.h"
 #include "array2d.h"
+#include "package_generator.h"
 
 class Container {
 public:
-  Container(int height, const std::vector<Package>&);
+  Container(int height, const std::vector<Package>&, PackageGenerateInfo);
   auto height() const noexcept -> int;
   auto packages() const noexcept -> const std::vector<Package>&;
   auto height_map() const noexcept -> const Array2D<int>&;
@@ -24,6 +25,7 @@ private:
 
   int m_height;
   std::vector<Package> m_packages;
+  PackageGenerateInfo m_generate_info;
   Array2D<int> m_height_map;
   mutable std::vector<std::pair<glm::ivec3, int>> first_fit_info;
 };

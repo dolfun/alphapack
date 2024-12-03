@@ -33,5 +33,3 @@ def run(*, server=HTTPServer, handler=ServerHandler, port=8000):
   print(f'Starting HTTP server on address: {sa[0]}, port: {sa[1]}')
 
   httpd.serve_forever()
-
-__all__ = ['ServerHandler', 'run']

@@ -12,7 +12,7 @@ auto state_evaluator(const Container& container) {
 
   cpr::Buffer buffer {
     reinterpret_cast<char*>(&data[0]),
-    reinterpret_cast<char*>(&data[0] + sizeof(data[0]) * data.size()),
+    reinterpret_cast<char*>(&data[0] + data.size()),
     "data.bin"
   };
   
@@ -51,7 +51,7 @@ void generate_episodes(int nr_episodes, int simulations_per_move, std::string ou
     auto packages = generate_packages(seed_dist(engine), Container::action_count, generate_info);
 
     int container_height = 24;
-    Container container { container_height, packages };
+    Container container { container_height, packages, generate_info };
     auto episode = generate_episode(container, simulations_per_move, state_evaluator);
     for (const auto& evaluation : episode) {
       auto data = evaluation.state.flatten();

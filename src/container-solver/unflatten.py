@@ -13,5 +13,3 @@ def unflatten(data):
   packages_data = data[image_data_size:]
 
   return image_data, packages_data
-
-__all__ = ['Info', 'unflatten']

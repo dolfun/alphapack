@@ -2,8 +2,8 @@
 #include <map>
 #include <cassert>
 
-Container::Container(int height, const std::vector<Package>& _packages)
-  : m_height { height }, m_packages { _packages },
+Container::Container(int height, const std::vector<Package>& _packages, PackageGenerateInfo generate_info = {})
+  : m_height { height }, m_packages { _packages }, m_generate_info { generate_info },
     m_height_map { Container::length, Container::width },
     first_fit_info(action_count) {}
 
@@ -77,11 +77,17 @@ auto Container::flatten() const noexcept -> std::vector<float> {
       for (int i = 0; i < values_per_packages; ++i) {
         data.push_back(0.0f);
       }
+      
     } else {
-      data.push_back(pkg.shape.x);
-      data.push_back(pkg.shape.y);
-      data.push_back(pkg.shape.z);
-      data.push_back(pkg.cost);
+      const int max_dim = m_generate_info.max_shape_dims;
+      const int min_dim = m_generate_info.min_shape_dims;
+      const int max_cost = m_generate_info.max_cost;
+      const int min_cost = m_generate_info.min_cost;
+
+      data.push_back(static_cast<float>(pkg.shape.x - min_dim) / (max_dim - min_dim));
+      data.push_back(static_cast<float>(pkg.shape.y - min_dim) / (max_dim - min_dim));
+      data.push_back(static_cast<float>(pkg.shape.z - min_dim) / (max_dim - min_dim));
+      data.push_back(static_cast<float>(pkg.cost - min_cost) / (max_cost - min_cost));
     }
   }
 
