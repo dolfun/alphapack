@@ -7,13 +7,14 @@
 #include <utility>
 #include <algorithm>
 
+namespace mcts {
+
 template <typename State>
 concept StateConcept = requires(State& state, int action_idx) {
   { State::action_count } -> std::convertible_to<size_t>;
   { std::as_const(state).possible_actions() } -> std::same_as<std::vector<int>>;
   { state.transition(action_idx) } -> std::same_as<void>;
   { std::as_const(state).reward() } -> std::same_as<float>;
-  { std::as_const(state).flatten() } -> std::same_as<std::vector<float>>;
 };
 
 template <typename F, typename State>
@@ -141,4 +142,6 @@ auto generate_episode(State state, int simulations_per_move, StateEvaluator&& ev
   }
 
   return state_evaluations;
+}
+
 }

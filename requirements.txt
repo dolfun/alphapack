@@ -3,4 +3,5 @@ pandas
 matplotlib
 plotly
 ipykernel
-requests-toolbelt
+fastapi[standard]
+mypy

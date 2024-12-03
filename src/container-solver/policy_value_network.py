@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from unflatten import Info
+from container_solver import Container
 
 class PolicyValueNetwork(nn.Module):
   def __init__(self):
@@ -13,7 +13,7 @@ class PolicyValueNetwork(nn.Module):
 
     self.flattened_size = 32 * 8 * 8
 
-    self.fc1 = nn.Linear(self.flattened_size + 4 * Info.action_count, 64)
+    self.fc1 = nn.Linear(self.flattened_size + 4 * Container.action_count, 64)
     self.fc2_policy = nn.Linear(64, 32)
     self.fc2_value = nn.Linear(64, 1)
 

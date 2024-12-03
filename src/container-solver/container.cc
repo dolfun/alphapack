@@ -1,102 +1,28 @@
 #include "container.h"
 #include <map>
 #include <cassert>
+#include <cstring>
 
-Container::Container(int height, const std::vector<Package>& _packages, PackageGenerateInfo generate_info = {})
-  : m_height { height }, m_packages { _packages }, m_generate_info { generate_info },
-    m_height_map { Container::length, Container::width },
-    first_fit_info(action_count) {}
-
-auto Container::height() const noexcept -> int {
-  return m_height;
-}
-
-auto Container::packages() const noexcept -> const std::vector<Package>& {
-  return m_packages;
-}
-
-auto Container::height_map() const noexcept -> const Array2D<int>& {
-  return m_height_map;
-}
-
-auto Container::possible_actions() const -> std::vector<int> {
-  std::vector<int> actions;
-
-  for (int i = 0; i < std::ssize(m_packages); ++i) {
-    const auto& pkg = m_packages[i];
-    if (pkg.is_placed) continue;
-
-    for (int orientation = 5; orientation >= 0; --orientation) {
-      auto mask = get_valid_state_mask(pkg, orientation);
-      for (int x = 0; x < mask.nr_rows(); ++x) {
-        for (int y = 0; y < mask.nr_cols(); ++y) {
-          if (mask[x, y] >= 0) {
-            glm::ivec3 pos = { x, y, mask[x, y] };
-            first_fit_info[i] = { pos, orientation };
-            actions.push_back(i);
-            goto exit;
-          }
-        }
-      }
-      exit:
-    }
+glm::ivec3 get_shape_along_axes(glm::ivec3 shape, int orientation) {
+  static constexpr int ORIENTATIONS[6][3] = {
+    { 0, 1, 2 },
+    { 0, 2, 1 },
+    { 1, 0, 2 },
+    { 1, 2, 0 },
+    { 2, 0, 1 },
+    { 2, 1, 0 },
+  };
+  
+  glm::ivec3 shape_along_axes;
+  for (int i = 0; i < 3; ++i) {
+    shape_along_axes[i] = shape[ORIENTATIONS[orientation][i]];
   }
-
-  return actions;
-}
-
-void Container::transition(int action_idx) {
-  auto [pos, orientation] = first_fit_info[action_idx];
-  place_package(m_packages[action_idx], pos, orientation);
-}
-
-float Container::reward() const noexcept {
-  float total_volume = 0.0f;
-  for (auto pkg : m_packages) {
-    if (pkg.is_placed) total_volume += pkg.shape.x * pkg.shape.y * pkg.shape.z;
-  }
-  float packing_efficiency = total_volume / (m_height * Container::length * Container::width);
-  return packing_efficiency;
-}
-
-auto Container::flatten() const noexcept -> std::vector<float> {
-  size_t height_map_size = m_height_map.data().size();
-  size_t values_per_packages = 4;
-  size_t packages_size = values_per_packages * m_packages.size();
-
-  std::vector<float> data;
-  data.reserve(height_map_size + packages_size);
-  for (int x = 0; x < m_height_map.nr_rows(); ++x) {
-    for (int y = 0; y < m_height_map.nr_cols(); ++y) {
-      data.push_back(static_cast<float>(m_height_map[x, y]) / m_height);
-    }
-  }
-
-  for (const auto& pkg : m_packages) {
-    if (pkg.is_placed) {
-      for (int i = 0; i < values_per_packages; ++i) {
-        data.push_back(0.0f);
-      }
-      
-    } else {
-      const int max_dim = m_generate_info.max_shape_dims;
-      const int min_dim = m_generate_info.min_shape_dims;
-      const int max_cost = m_generate_info.max_cost;
-      const int min_cost = m_generate_info.min_cost;
-
-      data.push_back(static_cast<float>(pkg.shape.x - min_dim) / (max_dim - min_dim));
-      data.push_back(static_cast<float>(pkg.shape.y - min_dim) / (max_dim - min_dim));
-      data.push_back(static_cast<float>(pkg.shape.z - min_dim) / (max_dim - min_dim));
-      data.push_back(static_cast<float>(pkg.cost - min_cost) / (max_cost - min_cost));
-    }
-  }
-
-  return data;
+  return shape_along_axes;
 }
 
 template <typename T>
 auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<std::pair<T, int>> {
-  std::size_t n_arr = arr.nr_rows(), m_arr = arr.nr_cols();
+  std::size_t n_arr = arr.rows(), m_arr = arr.cols();
   std::size_t n_shape = shape.x, m_shape = shape.y;
 
   Array2D<std::pair<T, int>> res { n_arr, m_arr };
@@ -142,12 +68,114 @@ auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<
   return res;
 }
 
+Container::Container(int height, const std::vector<Package>& packages)
+  : m_height { height }, m_packages { packages },
+    m_height_map { Container::length, Container::width },
+    first_fit_info(action_count) {}
+
+Container::Container(int height, std::vector<Package>&& packages, Array2D<int>&& height_map)
+  : m_height { height }, m_packages { std::move(packages) }, m_height_map { std::move(height_map) },
+    first_fit_info(action_count) {}
+
+auto Container::height() const noexcept -> int {
+  return m_height;
+}
+
+auto Container::packages() const noexcept -> const std::vector<Package>& {
+  return m_packages;
+}
+
+auto Container::height_map() const noexcept -> const Array2D<int>& {
+  return m_height_map;
+}
+
+auto Container::possible_actions() const -> std::vector<int> {
+  std::vector<int> actions;
+
+  for (int i = 0; i < std::ssize(m_packages); ++i) {
+    const auto& pkg = m_packages[i];
+    if (pkg.is_placed) continue;
+
+    for (int orientation = 5; orientation >= 0; --orientation) {
+      auto mask = get_valid_state_mask(pkg, orientation);
+      for (int x = 0; x < mask.rows(); ++x) {
+        for (int y = 0; y < mask.cols(); ++y) {
+          if (mask[x, y] >= 0) {
+            glm::ivec3 pos = { x, y, mask[x, y] };
+            first_fit_info[i] = { pos, orientation };
+            actions.push_back(i);
+            goto exit;
+          }
+        }
+      }
+      exit:
+    }
+  }
+
+  return actions;
+}
+
+void Container::transition(int action_idx) {
+  auto [pos, orientation] = first_fit_info[action_idx];
+  place_package(m_packages[action_idx], pos, orientation);
+}
+
+float Container::reward() const noexcept {
+  float total_volume = 0.0f;
+  for (auto pkg : m_packages) {
+    if (pkg.is_placed) total_volume += pkg.shape.x * pkg.shape.y * pkg.shape.z;
+  }
+  float packing_efficiency = total_volume / (m_height * Container::length * Container::width);
+  return packing_efficiency;
+}
+
+auto Container::serialize() const noexcept -> std::string {
+  std::pair<const void*, size_t> infos[] = {
+    { &m_height, sizeof(int) },
+    { &m_packages[0], sizeof(Package) * action_count },
+    { &m_height_map[0, 0], sizeof(int) * length * width }
+  };
+
+  size_t total_size = 0;
+  for (auto [ptr, size] : infos) {
+    total_size += size;
+  }
+
+  std::string bytes(total_size, ' ');
+  char* dest = &bytes[0];
+  for (auto [src, size] : infos) {
+    std::memcpy(dest, src, size);
+    dest += size;
+  }
+  return bytes;
+}
+
+Container Container::unserialize(const std::string& bytes) {
+  int height;
+  std::vector<Package> packages(action_count);
+  Array2D<int> height_map(length, width);
+
+  std::pair<void*, size_t> infos[] = {
+    { &height, sizeof(int) },
+    { &packages[0], sizeof(Package) * action_count },
+    { &height_map[0, 0], sizeof(int) * length * width }
+  };
+
+  const char* src = &bytes[0];
+  for (auto [dest, size] : infos) {
+    std::memcpy(dest, src, size);
+    src += size;
+  }
+
+  return Container(height, std::move(packages), std::move(height_map));
+}
+
 auto Container::get_valid_state_mask(const Package& pkg, int orientation) const noexcept -> Array2D<int> {
   Array2D<int> mask { Container::length, Container::width, -1 };
-  auto shape = Package::get_shape_along_axes(pkg.shape, orientation);
+  auto shape = get_shape_along_axes(pkg.shape, orientation);
   auto max_height_freq = get_max_freq_in_window(m_height_map, shape);
-  for (std::size_t x = 0; x <= mask.nr_rows() - shape.x; ++x) {
-    for (std::size_t y = 0; y <= mask.nr_cols() - shape.y; ++y) {
+  for (std::size_t x = 0; x <= mask.rows() - shape.x; ++x) {
+    for (std::size_t y = 0; y <= mask.cols() - shape.y; ++y) {
       auto [max_height, freq] = max_height_freq[x, y];
       if (max_height + shape.z > m_height) continue;
 
@@ -164,7 +192,7 @@ auto Container::get_valid_state_mask(const Package& pkg, int orientation) const 
 void Container::place_package(Package& pkg, glm::ivec3 pos, int orientation) noexcept {
   assert(!pkg.is_placed);
   pkg.is_placed = true;
-  pkg.shape = Package::get_shape_along_axes(pkg.shape, orientation);
+  pkg.shape = get_shape_along_axes(pkg.shape, orientation);
   pkg.pos = pos;
 
   auto pos2 = pkg.pos + pkg.shape;
