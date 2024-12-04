@@ -15,24 +15,24 @@ from tqdm import tqdm
 
 class ExperienceReplay(Dataset):
   def __init__(self, episodes_file_path):
-    self.episodes = []
+    self.state_evaluations = []
     with open(episodes_file_path, 'rb') as f:
       while True:
         try:
-          self.episodes.append(pickle.load(f))
+          self.state_evaluations.append(pickle.load(f))
         except EOFError:
           break
 
   def __len__(self):
-    return len(self.episodes)
+    return len(self.state_evaluations)
   
   def __getitem__(self, idx):
-    return self.episodes[idx]
+    return self.state_evaluations[idx]
 
-def save_episode(episode, episodes_file):
-  container = episode.container
-  priors = episode.priors
-  reward = episode.reward
+def save_state_evaluation(evaluation, episodes_file):
+  container = evaluation.container
+  priors = evaluation.priors
+  reward = evaluation.reward
 
   height_map = np.array(container.height_map, dtype=np.float32) / container.height
   height_map = np.expand_dims(height_map, axis=0)
@@ -41,22 +41,22 @@ def save_episode(episode, episodes_file):
   reward = np.array([reward], dtype=np.float32)
   pickle.dump((height_map, packages_data, priors, reward), episodes_file)
 
-def generate_training_data(games_per_iteration, simulations_per_move, episodes_file):
+def generate_training_data(games_per_iteration, simulations_per_move, c_puct, episodes_file):
   rewards = []
-  episodes_count = 0
+  data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
     container_height = 24
     packages = [random_package() for _ in range(Container.action_count)]
     container = Container(container_height, packages)
 
-    episodes = generate_episode(container, simulations_per_move)
-    episodes_count += len(episodes)
-    rewards.append(episodes[-1].reward)
+    episode = generate_episode(container, simulations_per_move, c_puct)
+    data_points_count += len(episode)
+    rewards.append(episode[-1].reward)
     
-    for episode in episodes:
-      save_episode(episode, episodes_file)
+    for state_evaluation in episode:
+      save_state_evaluation(state_evaluation, episodes_file)
 
-  print(f'{episodes_count} episodes generated')
+  print(f'{data_points_count} data points generated')
   rewards = np.array(rewards)
   print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.2}')
 
@@ -76,25 +76,27 @@ def perform_iteration(model_path, worker_addresses, episodes_file_path, generate
         raise Exception(f'Model upload failed on worker: {address}')
 
   # Generate Games
-  print('Generating Games:')
+  print('GENERATING GAMES:')
   with open(episodes_file_path, 'w'):
     pass
 
-  games_per_iteration = 16
-  simulations_per_move = 16
   with open(episodes_file_path, 'ab') as file:
-    generate_training_data(games_per_iteration, simulations_per_move, file)
-  print()
+    games_per_iteration = 16
+    simulations_per_move = 16
+    c_puct = 5.0
+    generate_training_data(games_per_iteration, simulations_per_move, c_puct, file)
 
   if generate_only:
     return
   
   # Train
-  print('Training:')
+  print('TRAINING:')
   dataset = ExperienceReplay(episodes_file_path)
-  dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+  print(f'{len(dataset)} data points loaded')
+
   model = PolicyValueNetwork()
   model.load_state_dict(torch.load(model_path, weights_only=True))
+  dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
   train_policy_value_network(model, dataloader)
   torch.save(model.state_dict(), model_path)
   print()
@@ -104,12 +106,12 @@ def main():
   parser.add_argument('--iteration_count', type=int, default=1)
   parser.add_argument('--model_path', default='policy_value_network.pth')
   parser.add_argument('--worker_addresses', default='127.0.0.1:8000')
-  parser.add_argument('--generate_only', type=bool, default=False)
+  parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
   worker_addresses = args.worker_addresses.split(';')
   for i in range(args.iteration_count):
-    print(f'ITERATION: [{i + 1}/{args.iteration_count}]')
+    print(f'[{i + 1}/{args.iteration_count}]')
     perform_iteration(args.model_path, worker_addresses, 'episodes.bin', args.generate_only)
 
 if __name__ == '__main__':

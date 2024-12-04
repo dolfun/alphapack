@@ -38,16 +38,15 @@ template <typename State>
 using NodePtr = Node<State>::Ptr;
 
 template <StateConcept State, StateEvaluatorConcept<State> StateEvaluator>
-void run_mcts_simulation(NodePtr<State> node, StateEvaluator&& evaluator) {
+void run_mcts_simulation(NodePtr<State> node, float c_puct, StateEvaluator&& evaluator) {
   // Selection
   std::vector<NodePtr<State>> search_path { node };
   while (node->visit_count > 0) {
     if (node->children.empty()) return;
 
     int total_visit_count = node->visit_count - 1;
-    auto calculate_score = [total_visit_count] (NodePtr<State> node) {
+    auto calculate_score = [c_puct, total_visit_count] (NodePtr<State> node) {
       float mean_action_value = (node->visit_count > 0 ? node->total_action_value / node->visit_count : 0);
-      constexpr float c_puct = 10.0f;
       float puct_score = c_puct * node->prior * sqrt(total_visit_count) / (1 + node->visit_count);
       float score = mean_action_value + puct_score;
       return score;
@@ -57,7 +56,7 @@ void run_mcts_simulation(NodePtr<State> node, StateEvaluator&& evaluator) {
     NodePtr<State> next_node;
     for (auto child : node->children) {
       float score = calculate_score(child);
-      if (score >= max_score) {
+      if (score > max_score) {
         max_score = score;
         next_node = child;
       }
@@ -114,14 +113,14 @@ struct Evaluation {
 };
 
 template <StateConcept State, StateEvaluatorConcept<State> StateEvaluator>
-auto generate_episode(State state, int simulations_per_move, StateEvaluator&& evaluator)
+auto generate_episode(State state, int simulations_per_move, float c_puct, StateEvaluator&& evaluator)
   -> std::vector<Evaluation<State>> {
 
   std::vector<Evaluation<State>> state_evaluations;
   auto node = std::make_shared<Node<State>>(std::move(state));
   while (true) {
     for (int i = 0; i < simulations_per_move; ++i) {
-      run_mcts_simulation<State>(node, evaluator);
+      run_mcts_simulation<State>(node, c_puct, evaluator);
     }
     if (node->children.empty()) break;
 

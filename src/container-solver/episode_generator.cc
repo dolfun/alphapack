@@ -19,8 +19,8 @@ auto state_evaluator(const Container& container) -> std::pair<std::vector<float>
   return std::make_pair(priors, value);
 };
 
-auto generate_episode(const Container& container, int simulations_per_move)
-  -> std::vector<mcts::Evaluation<Container>> {
-  auto episodes = mcts::generate_episode(container, simulations_per_move, state_evaluator);
+auto generate_episode(const Container& container, int simulations_per_move, float c_puct)
+    -> std::vector<mcts::Evaluation<Container>> {
+  auto episodes = mcts::generate_episode(container, simulations_per_move, c_puct, state_evaluator);
   return episodes;
 }
