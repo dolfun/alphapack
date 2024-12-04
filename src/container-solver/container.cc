@@ -108,8 +108,8 @@ auto Container::possible_actions() const -> std::vector<int> {
           }
         }
       }
-      exit:
     }
+    exit:
   }
 
   return actions;

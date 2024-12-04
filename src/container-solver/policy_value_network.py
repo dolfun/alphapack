@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch import optim
 from container_solver import Container
 
 class PolicyValueNetwork(nn.Module):
@@ -13,12 +14,13 @@ class PolicyValueNetwork(nn.Module):
 
     self.flattened_size = 32 * 8 * 8
 
-    self.fc1 = nn.Linear(self.flattened_size + 4 * Container.action_count, 64)
-    self.fc2_policy = nn.Linear(64, 32)
-    self.fc2_value = nn.Linear(64, 1)
+    self.fc1 = nn.Linear(self.flattened_size + 4 * Container.action_count, 96)
+    self.fc2 = nn.Linear(96, 48)
+    self.fc3_policy = nn.Linear(48, Container.action_count)
+    self.fc3_value = nn.Linear(48, 1)
 
-  def forward(self, image_data, packages_data):
-    x = self.cnn1(image_data)
+  def forward(self, height_map, packages_data):
+    x = self.cnn1(height_map)
     x = self.relu(x)
     x = self.cnn2(x)
     x = self.relu(x)
@@ -27,9 +29,34 @@ class PolicyValueNetwork(nn.Module):
     x = x.view(x.size(0), -1)
     x = torch.cat((x, packages_data), dim=1)
 
-    x= self.fc1(x)
-    policy_output = self.fc2_policy(x)
-    value_output = self.fc2_value(x)
+    x = self.fc1(x)
+    x = self.fc2(x)
+    policy_output = self.fc3_policy(x)
+    value_output = self.fc3_value(x)
+    value_output = torch.sigmoid(value_output)
 
     return policy_output, value_output
-  
+
+def train_policy_value_network(model, dataloader):
+  model.train()
+
+  learning_rate = 0.01
+  epochs_count = 3
+  momentum = 0.9
+
+  criterion_policy = nn.CrossEntropyLoss()
+  criterion_value = nn.MSELoss()
+  optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+  for epoch in range(epochs_count):
+    epoch_loss = 0.0
+
+    for height_map, package_data, priors, reward in dataloader:
+      predicted_priors, predicted_reward = model(height_map, package_data)
+      loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
+      optimizer.zero_grad()
+      loss.backward()
+      optimizer.step()
+      epoch_loss += loss.item()
+
+    avg_loss = epoch_loss / len(dataloader)
+    print(f"Epoch [{epoch+1}/{epochs_count}], Loss: {avg_loss:.4f}")

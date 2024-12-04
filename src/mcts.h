@@ -3,7 +3,6 @@
 #include <vector>
 #include <future>
 #include <utility>
-#include <algorithm>
 
 namespace mcts {
 
@@ -40,20 +39,31 @@ using NodePtr = Node<State>::Ptr;
 
 template <StateConcept State, StateEvaluatorConcept<State> StateEvaluator>
 void run_mcts_simulation(NodePtr<State> node, StateEvaluator&& evaluator) {
-  namespace rng = std::ranges;
-
   // Selection
   std::vector<NodePtr<State>> search_path { node };
   while (node->visit_count > 0) {
     if (node->children.empty()) return;
 
     int total_visit_count = node->visit_count - 1;
-    node = *rng::max_element(node->children, {}, [total_visit_count] (NodePtr<State> node) {
-      constexpr float c_puct = 2.0f;
+    auto calculate_score = [total_visit_count] (NodePtr<State> node) {
+      float mean_action_value = (node->visit_count > 0 ? node->total_action_value / node->visit_count : 0);
+      constexpr float c_puct = 10.0f;
       float puct_score = c_puct * node->prior * sqrt(total_visit_count) / (1 + node->visit_count);
-      float score = node->total_action_value / node->visit_count + puct_score;
+      float score = mean_action_value + puct_score;
       return score;
-    });
+    };
+
+    float max_score = -std::numeric_limits<float>::infinity();
+    NodePtr<State> next_node;
+    for (auto child : node->children) {
+      float score = calculate_score(child);
+      if (score >= max_score) {
+        max_score = score;
+        next_node = child;
+      }
+    }
+
+    node = next_node;
     search_path.push_back(node);
   }
 
@@ -94,12 +104,12 @@ void run_mcts_simulation(NodePtr<State> node, StateEvaluator&& evaluator) {
 template <typename State>
 struct Evaluation {
   template <typename T>
-  Evaluation (T&& _state, int _action_idx = -1, const std::vector<float>& _prior = {}, float _reward = {})
-    : state { std::forward<T>(_state) }, action_idx { _action_idx }, prior { _prior }, reward { _reward } {}
+  Evaluation (T&& _state, int _action_idx = -1, const std::vector<float>& _priors = {}, float _reward = {})
+    : state { std::forward<T>(_state) }, action_idx { _action_idx }, priors { _priors }, reward { _reward } {}
 
   State state;
   int action_idx;
-  std::vector<float> prior;
+  std::vector<float> priors;
   float reward;
 };
 
@@ -108,7 +118,6 @@ auto generate_episode(State state, int simulations_per_move, StateEvaluator&& ev
   -> std::vector<Evaluation<State>> {
 
   std::vector<Evaluation<State>> state_evaluations;
-  state_evaluations.emplace_back(state);
   auto node = std::make_shared<Node<State>>(std::move(state));
   while (true) {
     for (int i = 0; i < simulations_per_move; ++i) {
@@ -127,7 +136,7 @@ auto generate_episode(State state, int simulations_per_move, StateEvaluator&& ev
         next_node = child;
       }
 
-      priors[child->action_idx] = static_cast<float>(child->visit_count) / node->visit_count;
+      priors[child->action_idx] = static_cast<float>(child->visit_count) / (node->visit_count - 1);
     }
 
     state_evaluations.emplace_back(std::move(node->state), action_idx, priors);

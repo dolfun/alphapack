@@ -68,7 +68,7 @@ PYBIND11_MODULE(container_solver, m) {
   py::class_<Evaluation>(m, "Evaluation")
     .def_readwrite("container", &Evaluation::state)
     .def_readwrite("action_idx", &Evaluation::action_idx)
-    .def_readwrite("prior", &Evaluation::prior)
+    .def_readwrite("priors", &Evaluation::priors)
     .def_readwrite("reward", &Evaluation::reward);
 
   // generate episode
