@@ -21,10 +21,11 @@ concept StateEvaluatorConcept = requires(const State& state, F&& f) {
 
 template <StateConcept State>
 struct Node {
-  template <typename T>
-  Node(T&& _state) : state { std::forward<T>(_state) } {}
+  Node() = default;
 
-  State state;
+  std::shared_ptr<State> state;
+  std::weak_ptr<State> prev_state;
+
   int action_idx = -1;
   int visit_count = 0;
   float total_action_value = 0.0f;
@@ -66,19 +67,26 @@ void run_mcts_simulation(NodePtr<State> node, float c_puct, StateEvaluator&& eva
     search_path.push_back(node);
   }
 
+  // Lazy State Update
+  if (node->state == nullptr) {
+    std::shared_ptr<State> prev_state = node->prev_state.lock();
+    node->state = std::make_shared<State>(*prev_state);
+    node->state->transition(node->action_idx);
+  }
+
   // Evaluation
   auto evaluator_result = std::async(
     std::launch::async,
     std::forward<StateEvaluator>(evaluator),
-    node->state
+    *node->state
   );
 
   // Expansion
-  auto actions = node->state.possible_actions();
+  auto actions = node->state->possible_actions();
   for (auto action_idx : actions) {
-    auto child = std::make_shared<Node<State>>(node->state);
+    auto child = std::make_shared<Node<State>>();
+    child->prev_state = node->state;
     child->action_idx = action_idx;
-    child->state.transition(action_idx);
     node->children.push_back(child);
   }
 
@@ -102,9 +110,8 @@ void run_mcts_simulation(NodePtr<State> node, float c_puct, StateEvaluator&& eva
 
 template <typename State>
 struct Evaluation {
-  template <typename T>
-  Evaluation (T&& _state, int _action_idx = -1, const std::vector<float>& _priors = {}, float _reward = {})
-    : state { std::forward<T>(_state) }, action_idx { _action_idx }, priors { _priors }, reward { _reward } {}
+  Evaluation (const State& _state, int _action_idx = -1, const std::vector<float>& _priors = {}, float _reward = {})
+    : state { _state }, action_idx { _action_idx }, priors { _priors }, reward { _reward } {}
 
   State state;
   int action_idx;
@@ -117,7 +124,8 @@ auto generate_episode(State state, int simulations_per_move, float c_puct, State
   -> std::vector<Evaluation<State>> {
 
   std::vector<Evaluation<State>> state_evaluations;
-  auto node = std::make_shared<Node<State>>(std::move(state));
+  auto node = std::make_shared<Node<State>>();
+  node->state = std::make_shared<State>(state);
   while (true) {
     for (int i = 0; i < simulations_per_move; ++i) {
       run_mcts_simulation<State>(node, c_puct, evaluator);
@@ -138,11 +146,11 @@ auto generate_episode(State state, int simulations_per_move, float c_puct, State
       priors[child->action_idx] = static_cast<float>(child->visit_count) / (node->visit_count - 1);
     }
 
-    state_evaluations.emplace_back(std::move(node->state), action_idx, priors);
+    state_evaluations.emplace_back(*node->state, action_idx, priors);
     node = next_node;
   }
 
-  auto reward = node->state.reward();
+  auto reward = node->state->reward();
   for (auto& evaluation : state_evaluations) {
     evaluation.reward = reward;
   }
