@@ -5,3 +5,6 @@ plotly
 ipykernel
 fastapi[standard]
 mypy
+requests
+tqdm
+torch
