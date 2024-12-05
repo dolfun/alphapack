@@ -25,12 +25,12 @@ async def root(request: Request):
   data = await request.body()
   
   container = Container.unserialize(data)
-  height_map = np.array(container.height_map, dtype=np.float32) / container.height
-  height_map = torch.tensor(height_map).unsqueeze(0).unsqueeze(0)
+  image_data = np.array(container.height_map, dtype=np.float32) / container.height
+  image_data = torch.tensor(image_data).unsqueeze(0).unsqueeze(0)
   packages_data = torch.tensor(normalize_packages(container.packages)).unsqueeze(0)
   
   with torch.no_grad():
-    policy, value = policy_value_network.forward(height_map, packages_data)
+    policy, value = policy_value_network.forward(image_data, packages_data)
     policy = policy.squeeze(dim=0)
     policy = torch.softmax(policy, dim=0)
     value = value.squeeze(dim=0)

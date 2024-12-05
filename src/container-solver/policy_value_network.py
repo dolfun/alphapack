@@ -40,8 +40,8 @@ class PolicyValueNetwork(nn.Module):
 def train_policy_value_network(model, dataloader):
   model.train()
 
-  learning_rate = 0.01
-  epochs_count = 3
+  learning_rate = 0.05
+  epochs_count = 5
   momentum = 0.9
 
   criterion_policy = nn.CrossEntropyLoss()
@@ -50,8 +50,8 @@ def train_policy_value_network(model, dataloader):
   for epoch in range(epochs_count):
     epoch_loss = 0.0
 
-    for height_map, package_data, priors, reward in dataloader:
-      predicted_priors, predicted_reward = model(height_map, package_data)
+    for image_data, package_data, priors, reward in dataloader:
+      predicted_priors, predicted_reward = model(image_data, package_data)
       loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
       optimizer.zero_grad()
       loss.backward()

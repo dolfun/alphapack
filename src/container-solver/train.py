@@ -15,13 +15,36 @@ from tqdm import tqdm
 
 class ExperienceReplay(Dataset):
   def __init__(self, episodes_file_path):
-    self.state_evaluations = []
+    evaluations = []
     with open(episodes_file_path, 'rb') as f:
       while True:
         try:
-          self.state_evaluations.append(pickle.load(f))
+          evaluations.append(pickle.load(f))
         except EOFError:
           break
+    self.state_evaluations = self.__augment_data(evaluations)
+
+  def __augment_data(self, evaluations):
+    augmented_data = []
+    for image_data, package_data, priors, reward in evaluations:
+      image_data = image_data[0]
+      reflected = np.flip(image_data, axis=0)
+      symmetries = (
+        image_data,
+        np.rot90(image_data, k=1),
+        np.rot90(image_data, k=2),
+        np.rot90(image_data, k=-1),
+        reflected,
+        np.rot90(reflected, k=1),
+        np.rot90(reflected, k=2),
+        np.rot90(reflected, k=-1)
+      )
+
+      for image_data in symmetries:
+        image_data = np.expand_dims(image_data, axis=0)
+        augmented_data.append((image_data.copy(), package_data, priors, reward))
+
+    return augmented_data
 
   def __len__(self):
     return len(self.state_evaluations)
@@ -81,10 +104,12 @@ def perform_iteration(model_path, worker_addresses, episodes_file_path, generate
     pass
 
   with open(episodes_file_path, 'ab') as file:
-    games_per_iteration = 16
-    simulations_per_move = 16
+    games_per_iteration = 32
+    simulations_per_move = 256
     c_puct = 5.0
     generate_training_data(games_per_iteration, simulations_per_move, c_puct, file)
+
+  print()
 
   if generate_only:
     return
