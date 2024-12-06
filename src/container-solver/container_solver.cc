@@ -81,6 +81,7 @@ PYBIND11_MODULE(container_solver, m) {
     py::arg("c_puct"),
     py::arg("virtual_loss"),
     py::arg("thread_count"),
-    py::arg("batch_size")
+    py::arg("batch_size"),
+    py::arg("addresses")
   );
 }

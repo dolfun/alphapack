@@ -22,6 +22,7 @@ FetchContent_MakeAvailable(pybind11)
 
 pybind11_add_module(
   container_solver
+  mcts.h
   array2d.h
   package.h
   container.h
@@ -31,22 +32,23 @@ pybind11_add_module(
   container_solver.cc
 )
 
-target_compile_features(container_solver PUBLIC cxx_std_23)
-target_link_libraries(container_solver PUBLIC glm::glm-header-only cpr::cpr pybind11::pybind11)
+target_compile_features(container_solver PUBLIC cxx_std_20)
+target_link_libraries(container_solver PUBLIC glm::glm-header-only cpr::cpr)
 
 set(MODULE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/src/container-solver)
-
 set_target_properties(
   container_solver
   PROPERTIES LIBRARY_OUTPUT_DIRECTORY
   ${MODULE_OUTPUT_DIR}
 )
 
-set(stubgen_executable "${CMAKE_SOURCE_DIR}/venv/bin/stubgen")
+set(STUBGEN_EXECUTABLE "${CMAKE_SOURCE_DIR}/venv/bin/stubgen")
 if(WIN32)
-  set(stubgen_executable "${CMAKE_SOURCE_DIR}/venv/Scripts/stubgen.exe")
+  set(STUBGEN_EXECUTABLE "${CMAKE_SOURCE_DIR}/venv/Scripts/stubgen.exe")
 endif()
 
-add_custom_command(TARGET container_solver POST_BUILD
-  COMMAND ${stubgen_executable} -m container_solver -o .
-  WORKING_DIRECTORY ${MODULE_OUTPUT_DIR})
+if (EXISTS ${STUBGEN_EXECUTABLE})
+  add_custom_command(TARGET container_solver POST_BUILD
+    COMMAND ${STUBGEN_EXECUTABLE} -m container_solver -o .
+    WORKING_DIRECTORY ${MODULE_OUTPUT_DIR})
+endif()

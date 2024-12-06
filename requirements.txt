@@ -1,11 +1,6 @@
-numpy
-pandas
-matplotlib
-plotly
-ipykernel
-fastapi[standard]
-cereal[redis]
-mypy
-requests
-tqdm
 torch
+numpy
+fastapi[standard]
+requests
+mypy
+tqdm

@@ -64,7 +64,10 @@ def save_state_evaluation(evaluation, episodes_file):
   reward = np.array([reward], dtype=np.float32)
   pickle.dump((height_map, packages_data, priors, reward), episodes_file)
 
-def generate_training_data(games_per_iteration, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size, episodes_file):
+def generate_training_data(
+    games_per_iteration, simulations_per_move, 
+    c_puct, virtual_loss, thread_count, batch_size, 
+    addresses, episodes_file):
   rewards = []
   data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
@@ -72,7 +75,11 @@ def generate_training_data(games_per_iteration, simulations_per_move, c_puct, vi
     packages = [random_package() for _ in range(Container.action_count)]
     container = Container(container_height, packages)
 
-    episode = generate_episode(container, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size)
+    episode = generate_episode(
+      container, simulations_per_move, 
+      c_puct, virtual_loss, thread_count, 
+      batch_size, addresses
+    )
     data_points_count += len(episode)
     rewards.append(episode[-1].reward)
 
@@ -83,7 +90,7 @@ def generate_training_data(games_per_iteration, simulations_per_move, c_puct, vi
   rewards = np.array(rewards)
   print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.2}')
 
-def perform_iteration(model_path, worker_addresses, episodes_file_path, generate_only=False):
+def perform_iteration(model_path, addresses, episodes_file_path, generate_only=False):
   # Create model if it does not exist
   if not os.path.exists(model_path):
     policy_value_network = PolicyValueNetwork()
@@ -91,10 +98,10 @@ def perform_iteration(model_path, worker_addresses, episodes_file_path, generate
 
   # Uploaad model to all workers
   with open(model_path, 'rb') as model:
-    for address in worker_addresses:
+    for address in addresses:
       model.seek(0)
       files = { 'file': model }
-      response = requests.post('http://' + address + '/policy_value_upload', files=files)
+      response = requests.post('http://' + address + ':8000/policy_value_upload', files=files)
       if response.text != 'success':
         raise Exception(f'Model upload failed on worker: {address}')
 
@@ -110,7 +117,11 @@ def perform_iteration(model_path, worker_addresses, episodes_file_path, generate
     virtual_loss = 3
     thread_count = 16
     batch_size = 4
-    generate_training_data(games_per_iteration, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size, file)
+    generate_training_data(
+      games_per_iteration, simulations_per_move, 
+      c_puct, virtual_loss, thread_count, batch_size, 
+      addresses, file
+    )
 
   print()
 
@@ -133,14 +144,14 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
   parser.add_argument('--model_path', default='policy_value_network.pth')
-  parser.add_argument('--worker_addresses', default='127.0.0.1:8000')
+  parser.add_argument('--worker_addresses', default='127.0.0.1')
   parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
-  worker_addresses = args.worker_addresses.split(';')
+  addresses = args.worker_addresses.split(';')
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(args.model_path, worker_addresses, 'episodes.bin', args.generate_only)
+    perform_iteration(args.model_path, addresses, 'episodes.bin', args.generate_only)
 
 if __name__ == '__main__':
   main()

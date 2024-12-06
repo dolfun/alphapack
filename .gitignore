@@ -6,3 +6,6 @@
 __pycache__
 *.so
 *.pyi
+*.pyd
+*.ilk
+*.pdb

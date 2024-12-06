@@ -5,6 +5,7 @@
 #include <vector>
 #include <future>
 #include <utility>
+#include <semaphore>
 
 namespace mcts {
 

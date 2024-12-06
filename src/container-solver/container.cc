@@ -29,40 +29,40 @@ auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<
   for (std::size_t x = 0; x < n_arr; ++x) {
     std::map<int, int, std::greater<>> freq;
     for (std::size_t y = 0; y < m_shape; ++y) {
-      ++freq[arr[x, y]];
+      ++freq[arr(x, y)];
     }
 
     for (std::size_t y = 0; y < m_arr - m_shape; ++y) {
-      res[x, y] = *freq.begin();
+      res(x, y) = *freq.begin();
 
-      int val = arr[x, y];
+      int val = arr(x, y);
       if (--freq[val] == 0) {
         freq.erase(val);
       }
 
-      ++freq[arr[x, y + m_shape]];
+      ++freq[arr(x, y + m_shape)];
     }
-    res[x, m_arr - m_shape] = *freq.begin();
+    res(x, m_arr - m_shape) = *freq.begin();
   }
 
   for (std::size_t y = 0; y <= m_arr - m_shape; ++y) {
     std::map<int, int, std::greater<>> freq;
     for (std::size_t x = 0; x < n_shape; ++x) {
-      freq[res[x, y].first] += res[x, y].second;
+      freq[res(x, y).first] += res(x, y).second;
     }
 
     for (std::size_t x = 0; x < n_arr - n_shape; ++x) {
-      auto [val, cnt] = res[x, y];
-      res[x, y] = *freq.begin();
+      auto [val, cnt] = res(x, y);
+      res(x, y) = *freq.begin();
 
       freq[val] -= cnt;
       if (freq[val] == 0) {
         freq.erase(val);
       }
 
-      freq[res[x + n_shape, y].first] += res[x + n_shape, y].second;
+      freq[res(x + n_shape, y).first] += res(x + n_shape, y).second;
     }
-    res[n_arr - n_shape, y] = *freq.begin();
+    res(n_arr - n_shape, y) = *freq.begin();
   }
 
   return res;
@@ -95,18 +95,21 @@ auto Container::possible_actions() const -> std::vector<int> {
     if (pkg.is_placed) continue;
 
     for (int orientation = 5; orientation >= 0; --orientation) {
+      bool to_exit = false;
       auto mask = get_valid_state_mask(pkg, orientation);
       for (int x = 0; x < mask.rows(); ++x) {
         for (int y = 0; y < mask.cols(); ++y) {
-          if (mask[x, y] >= 0) {
-            glm::ivec3 pos = { x, y, mask[x, y] };
+          if (mask(x, y) >= 0) {
+            glm::ivec3 pos = { x, y, mask(x, y) };
             actions.push_back(i);
-            goto exit;
+            to_exit = true;
+            break;
           }
         }
+        if (to_exit) break;
       }
+      if (to_exit) break;
     }
-    exit:
   }
 
   return actions;
@@ -119,8 +122,8 @@ void Container::transition(int action_idx) {
     auto mask = get_valid_state_mask(pkg, orientation);
     for (int x = 0; x < mask.rows(); ++x) {
       for (int y = 0; y < mask.cols(); ++y) {
-        if (mask[x, y] >= 0) {
-          glm::ivec3 pos = { x, y, mask[x, y] };
+        if (mask(x, y) >= 0) {
+          glm::ivec3 pos = { x, y, mask(x, y) };
           place_package(pkg, pos, orientation);
           return;
         }
@@ -142,7 +145,7 @@ auto Container::serialize() const noexcept -> std::string {
   std::pair<const void*, size_t> infos[] = {
     { &m_height, sizeof(int) },
     { &m_packages[0], sizeof(Package) * action_count },
-    { &m_height_map[0, 0], sizeof(int) * length * width }
+    { &m_height_map(0, 0), sizeof(int) * length * width }
   };
 
   size_t total_size = 0;
@@ -167,7 +170,7 @@ Container Container::unserialize(const std::string& bytes) {
   std::pair<void*, size_t> infos[] = {
     { &height, sizeof(int) },
     { &packages[0], sizeof(Package) * action_count },
-    { &height_map[0, 0], sizeof(int) * length * width }
+    { &height_map(0, 0), sizeof(int) * length * width }
   };
 
   const char* src = &bytes[0];
@@ -185,13 +188,13 @@ auto Container::get_valid_state_mask(const Package& pkg, int orientation) const 
   auto max_height_freq = get_max_freq_in_window(m_height_map, shape);
   for (std::size_t x = 0; x <= mask.rows() - shape.x; ++x) {
     for (std::size_t y = 0; y <= mask.cols() - shape.y; ++y) {
-      auto [max_height, freq] = max_height_freq[x, y];
+      auto [max_height, freq] = max_height_freq(x, y);
       if (max_height + shape.z > m_height) continue;
 
       float min_base_contact_ratio = 0.75f;
       float base_contact_ratio = static_cast<float>(freq) / (shape.x * shape.y);
       if (base_contact_ratio >= min_base_contact_ratio) {
-        mask[x, y] = max_height;
+        mask(x, y) = max_height;
       }
     }
   }
@@ -207,7 +210,7 @@ void Container::place_package(Package& pkg, glm::ivec3 pos, int orientation) noe
   auto pos2 = pkg.pos + pkg.shape;
   for (int x = pkg.pos.x; x < pos2.x; ++x) {
     for (int y = pkg.pos.y; y < pos2.y; ++y) {
-      m_height_map[x, y] = pos2.z;
+      m_height_map(x, y) = pos2.z;
     }
   }
 }
