@@ -2,5 +2,5 @@
 #include "../mcts.h"
 #include "container.h"
 
-auto generate_episode(const Container&, int, float)
+auto generate_episode(const Container&, int, float, int, int, size_t)
   -> std::vector<mcts::Evaluation<Container>>;

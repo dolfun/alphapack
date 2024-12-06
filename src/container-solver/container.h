@@ -31,5 +31,4 @@ private:
   int m_height;
   std::vector<Package> m_packages;
   Array2D<int> m_height_map;
-  mutable std::vector<std::pair<glm::ivec3, int>> first_fit_info;
 };

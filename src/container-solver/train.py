@@ -64,7 +64,7 @@ def save_state_evaluation(evaluation, episodes_file):
   reward = np.array([reward], dtype=np.float32)
   pickle.dump((height_map, packages_data, priors, reward), episodes_file)
 
-def generate_training_data(games_per_iteration, simulations_per_move, c_puct, episodes_file):
+def generate_training_data(games_per_iteration, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size, episodes_file):
   rewards = []
   data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
@@ -72,10 +72,10 @@ def generate_training_data(games_per_iteration, simulations_per_move, c_puct, ep
     packages = [random_package() for _ in range(Container.action_count)]
     container = Container(container_height, packages)
 
-    episode = generate_episode(container, simulations_per_move, c_puct)
+    episode = generate_episode(container, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size)
     data_points_count += len(episode)
     rewards.append(episode[-1].reward)
-    
+
     for state_evaluation in episode:
       save_state_evaluation(state_evaluation, episodes_file)
 
@@ -105,9 +105,12 @@ def perform_iteration(model_path, worker_addresses, episodes_file_path, generate
 
   with open(episodes_file_path, 'ab') as file:
     games_per_iteration = 32
-    simulations_per_move = 256
+    simulations_per_move = 64
     c_puct = 5.0
-    generate_training_data(games_per_iteration, simulations_per_move, c_puct, file)
+    virtual_loss = 3
+    thread_count = 16
+    batch_size = 4
+    generate_training_data(games_per_iteration, simulations_per_move, c_puct, virtual_loss, thread_count, batch_size, file)
 
   print()
 

@@ -24,16 +24,22 @@ async def load_model(file: UploadFile = File(...)):
 async def root(request: Request):
   data = await request.body()
   
-  container = Container.unserialize(data)
-  image_data = np.array(container.height_map, dtype=np.float32) / container.height
-  image_data = torch.tensor(image_data).unsqueeze(0).unsqueeze(0)
-  packages_data = torch.tensor(normalize_packages(container.packages)).unsqueeze(0)
+  batch_size = int(request.headers['batch-size'])
+  if batch_size > 1: print(batch_size, len(data))
+  image_data = []
+  packages_data = []
+  step_size = len(data) // batch_size
+  containers = [Container.unserialize(data[i:i+step_size]) for i in range(0, len(data), step_size)]
+  for container in containers:
+    height_map = np.array(container.height_map, dtype=np.float32) / container.height
+    image_data.append(np.expand_dims(height_map, axis=0))
+    packages_data.append(normalize_packages(container.packages))
   
+  image_data = torch.tensor(np.stack(image_data, axis=0))
+  packages_data = torch.tensor(np.stack(packages_data, axis=0))
   with torch.no_grad():
     policy, value = policy_value_network.forward(image_data, packages_data)
-    policy = policy.squeeze(dim=0)
-    policy = torch.softmax(policy, dim=0)
-    value = value.squeeze(dim=0)
-    result = torch.cat((policy, value))
+    policy = torch.softmax(policy, dim=1)
+    result = torch.cat((policy, value), dim=1)
 
     return Response(content=result.numpy().tobytes(), media_type='application/octet-stream')

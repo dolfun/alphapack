@@ -78,6 +78,9 @@ PYBIND11_MODULE(container_solver, m) {
     &generate_episode,
     py::arg("container"),
     py::arg("simulations_per_move"),
-    py::arg("c_puct")
+    py::arg("c_puct"),
+    py::arg("virtual_loss"),
+    py::arg("thread_count"),
+    py::arg("batch_size")
   );
 }

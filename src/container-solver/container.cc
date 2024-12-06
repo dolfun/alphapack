@@ -70,12 +70,10 @@ auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<
 
 Container::Container(int height, const std::vector<Package>& packages)
   : m_height { height }, m_packages { packages },
-    m_height_map { Container::length, Container::width },
-    first_fit_info(action_count) {}
+    m_height_map { Container::length, Container::width } {}
 
 Container::Container(int height, std::vector<Package>&& packages, Array2D<int>&& height_map)
-  : m_height { height }, m_packages { std::move(packages) }, m_height_map { std::move(height_map) },
-    first_fit_info(action_count) {}
+  : m_height { height }, m_packages { std::move(packages) }, m_height_map { std::move(height_map) } {}
 
 auto Container::height() const noexcept -> int {
   return m_height;
@@ -102,7 +100,6 @@ auto Container::possible_actions() const -> std::vector<int> {
         for (int y = 0; y < mask.cols(); ++y) {
           if (mask[x, y] >= 0) {
             glm::ivec3 pos = { x, y, mask[x, y] };
-            first_fit_info[i] = { pos, orientation };
             actions.push_back(i);
             goto exit;
           }
@@ -116,8 +113,20 @@ auto Container::possible_actions() const -> std::vector<int> {
 }
 
 void Container::transition(int action_idx) {
-  auto [pos, orientation] = first_fit_info[action_idx];
-  place_package(m_packages[action_idx], pos, orientation);
+  assert(action_idx >= 0 && action_idx < Container::action_count);
+  auto& pkg = m_packages[action_idx];
+  for (int orientation = 5; orientation >= 0; --orientation) {
+    auto mask = get_valid_state_mask(pkg, orientation);
+    for (int x = 0; x < mask.rows(); ++x) {
+      for (int y = 0; y < mask.cols(); ++y) {
+        if (mask[x, y] >= 0) {
+          glm::ivec3 pos = { x, y, mask[x, y] };
+          place_package(pkg, pos, orientation);
+          return;
+        }
+      }
+    }
+  }
 }
 
 float Container::reward() const noexcept {
