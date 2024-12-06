@@ -101,7 +101,7 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     for address in addresses:
       model.seek(0)
       files = { 'file': model }
-      response = requests.post('http://' + address + ':8000/policy_value_upload', files=files)
+      response = requests.post('http://' + address + '/policy_value_upload', files=files)
       if response.text != 'success':
         raise Exception(f'Model upload failed on worker: {address}')
 
@@ -144,11 +144,11 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
   parser.add_argument('--model_path', default='policy_value_network.pth')
-  parser.add_argument('--worker_addresses', default='127.0.0.1')
+  parser.add_argument('--worker_addresses', default='127.0.0.1:8000')
   parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
-  addresses = args.worker_addresses.split(';')
+  addresses = args.worker_addresses.split(',')
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
     perform_iteration(args.model_path, addresses, 'episodes.bin', args.generate_only)

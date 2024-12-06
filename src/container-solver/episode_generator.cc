@@ -11,12 +11,12 @@ template <typename State>
 class InferenceQueue {
 public:
   InferenceQueue(size_t batch_size, const std::vector<std::string>& _addresses)
-   : m_batch_size { batch_size }, addresses { _addresses } {}
+   : m_batch_size { batch_size }, addresses { _addresses }, worker_use_count(addresses.size()) {}
 
   size_t batch_size() const noexcept { return m_batch_size; }
 
   auto enqueue(const State& state) -> std::future<InferenceResult_t> {
-    std::lock_guard<std::mutex> lock_guard { mutex };
+    std::lock_guard<std::mutex> lock_guard { inference_queue_mutex };
     std::promise<InferenceResult_t> promise;
     auto future = promise.get_future();
     inference_queue.emplace(state, std::move(promise));
@@ -32,7 +32,7 @@ public:
     std::string data;
     std::vector<std::promise<InferenceResult_t>> promises;
     {
-      std::lock_guard<std::mutex> lock_guard { mutex };
+      std::lock_guard<std::mutex> lock_guard { inference_queue_mutex };
       if (inference_queue.empty()) return;
       for (size_t i = 0; i < m_batch_size && !inference_queue.empty(); ++i) {
         auto [state, promise] = std::move(inference_queue.front());
@@ -43,16 +43,15 @@ public:
       }
     }
 
-    auto post_result = cpr::PostAsync(
-      cpr::Url { "http://127.0.0.1:8000/policy_value_inference" },
-      cpr::Header {
-        { "batch-size", std::to_string(promises.size()) },
-        { "Content-Type", "application/octet-stream" }
-      },
-      cpr::Body { &data[0], data.size() }
-    );
+    cpr::Url url { "http://" + get_address() + "/policy_value_inference" };
+    cpr::Header header {
+      { "batch-size", std::to_string(promises.size()) },
+      { "Content-Type", "application/octet-stream" }
+    };
+    cpr::Body body { &data[0], data.size() };
+    auto result = cpr::PostAsync(url, header, body);
 
-    auto text = post_result.get().text;
+    auto text = result.get().text;
     const char* ptr = &text[0];
     for (auto& promise : promises) {
       std::vector<float> priors(State::action_count);
@@ -69,10 +68,25 @@ public:
   }
 
 private:
-  std::mutex mutex;
+  std::string get_address() noexcept {
+    std::lock_guard<std::mutex> lock_guard { worker_use_count_mutex };
+
+    size_t min_idx = 0;
+    for (size_t i = 0; i < addresses.size(); ++i) {
+      if (worker_use_count[i] < worker_use_count[min_idx]) {
+        min_idx = i;
+      }
+    }
+
+    ++worker_use_count[min_idx];
+    return addresses[min_idx];
+  }
+
+  std::mutex inference_queue_mutex, worker_use_count_mutex;
   size_t m_batch_size;
   std::queue<std::pair<State, std::promise<InferenceResult_t>>> inference_queue;
   std::vector<std::string> addresses;
+  std::vector<size_t> worker_use_count;
 };
 
 auto generate_episode(

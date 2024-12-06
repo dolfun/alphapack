@@ -25,7 +25,7 @@ async def root(request: Request):
   data = await request.body()
   
   batch_size = int(request.headers['batch-size'])
-  if batch_size > 1: print(f'Inference for batch size {batch_size} received!')
+  # if batch_size > 1: print(f'Inference for batch size {batch_size} received!')
 
   image_data = []
   packages_data = []
