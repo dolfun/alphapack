@@ -4,6 +4,7 @@ matplotlib
 plotly
 ipykernel
 fastapi[standard]
+cereal[redis]
 mypy
 requests
 tqdm

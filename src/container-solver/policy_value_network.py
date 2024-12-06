@@ -1,7 +1,13 @@
 import torch
 from torch import nn
 from torch import optim
-from container_solver import Container
+
+action_count = 32
+try:
+  from container_solver import Container
+  action_count = Container.action_count
+except ImportError:
+  pass
 
 class PolicyValueNetwork(nn.Module):
   def __init__(self):
@@ -14,9 +20,9 @@ class PolicyValueNetwork(nn.Module):
 
     self.flattened_size = 32 * 8 * 8
 
-    self.fc1 = nn.Linear(self.flattened_size + 4 * Container.action_count, 96)
+    self.fc1 = nn.Linear(self.flattened_size + 4 * action_count, 96)
     self.fc2 = nn.Linear(96, 48)
-    self.fc3_policy = nn.Linear(48, Container.action_count)
+    self.fc3_policy = nn.Linear(48, action_count)
     self.fc3_value = nn.Linear(48, 1)
 
   def forward(self, height_map, packages_data):
