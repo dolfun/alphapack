@@ -1,3 +1,4 @@
+include(FetchContent)
 FetchContent_Declare(
   glm
   GIT_REPOSITORY https://github.com/g-truc/glm.git
@@ -31,7 +32,7 @@ pybind11_add_module(
 )
 
 target_compile_features(container_solver PUBLIC cxx_std_23)
-target_link_libraries(container_solver PUBLIC glm::glm cpr::cpr pybind11::pybind11)
+target_link_libraries(container_solver PUBLIC glm::glm-header-only cpr::cpr pybind11::pybind11)
 
 set(MODULE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/src/container-solver)
 

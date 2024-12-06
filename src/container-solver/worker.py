@@ -25,7 +25,6 @@ async def root(request: Request):
   data = await request.body()
   
   batch_size = int(request.headers['batch-size'])
-  if batch_size > 1: print(batch_size, len(data))
   image_data = []
   packages_data = []
   step_size = len(data) // batch_size
