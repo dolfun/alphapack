@@ -21,16 +21,21 @@ import pickle
 import argparse
 from tqdm import tqdm
 
+def get_test_train_data(episodes_file_path, *, ratio):
+  evaluations = []
+  with open(episodes_file_path, 'rb') as f:
+    while True:
+      try:
+        evaluations.append(pickle.load(f))
+      except EOFError:
+        break
+  
+  train_count = int(len(evaluations) * ratio)
+  return evaluations[:train_count], evaluations[train_count:]
+
 class ExperienceReplay(Dataset):
-  def __init__(self, episodes_file_path):
-    evaluations = []
-    with open(episodes_file_path, 'rb') as f:
-      while True:
-        try:
-          evaluations.append(pickle.load(f))
-        except EOFError:
-          break
-    self.state_evaluations = self.__augment_data(evaluations)
+  def __init__(self, evaluations):
+    self.evaluations = self.__augment_data(evaluations)
 
   def __augment_data(self, evaluations):
     augmented_data = []
@@ -55,10 +60,10 @@ class ExperienceReplay(Dataset):
     return augmented_data
 
   def __len__(self):
-    return len(self.state_evaluations)
+    return len(self.evaluations)
   
   def __getitem__(self, idx):
-    return self.state_evaluations[idx]
+    return self.evaluations[idx]
 
 def save_state_evaluation(evaluation, episodes_file):
   container = evaluation.container
@@ -67,7 +72,7 @@ def save_state_evaluation(evaluation, episodes_file):
 
   height_map = np.array(container.height_map, dtype=np.float32) / container.height
   height_map = np.expand_dims(height_map, axis=0)
-  packages_data = normalize_packages(container.packages)
+  packages_data = normalize_packages(container)
   priors = np.array(priors, dtype=np.float32)
   reward = np.array([reward], dtype=np.float32)
   pickle.dump((height_map, packages_data, priors, reward), episodes_file)
@@ -100,7 +105,7 @@ def generate_training_data(
     mcts_rewards.append(mcts_reward)
 
     relative_reward = (+1 if mcts_reward > baseline_reward else -1)
-    relative_rewards[relative_reward] += 1
+    relative_rewards[0 if relative_reward == -1 else 1] += 1
 
     for state_evaluation in episode:
       state_evaluation.reward = relative_reward
@@ -144,7 +149,7 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     c_puct = 5.0
     virtual_loss = 5
     thread_count = 16
-    batch_size = 8
+    batch_size = 4
     generate_training_data(
       games_per_iteration, simulations_per_move, 
       c_puct, virtual_loss, thread_count, batch_size, 
@@ -158,13 +163,17 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
   
   # Train
   print('TRAINING:')
-  dataset = ExperienceReplay(episodes_file_path)
-  print(f'{len(dataset)} data points loaded')
+  train_data, test_data = get_test_train_data(episodes_file_path, ratio=0.8)
+  train_dataset = ExperienceReplay(train_data)
+  test_dataset = ExperienceReplay(test_data)
+
+  trainloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+  testloader = DataLoader(test_dataset, batch_size=32, shuffle=True)
 
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
-  dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-  train_policy_value_network(model, dataloader, device)
+  train_policy_value_network(model, trainloader, testloader, device)
+  
   torch.save(model.state_dict(), model_path)
   print()
 

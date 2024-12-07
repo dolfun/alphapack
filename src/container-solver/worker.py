@@ -26,6 +26,7 @@ async def load_model(file: UploadFile = File(...)):
   content = await file.read()
   content = io.BytesIO(content)
   policy_value_network.load_state_dict(torch.load(content, weights_only=False))
+  policy_value_network.eval()
   return PlainTextResponse(content='success')
 
 @app.post('/policy_value_inference')
@@ -42,7 +43,7 @@ async def root(request: Request):
   for container in containers:
     height_map = np.array(container.height_map, dtype=np.float32) / container.height
     image_data.append(np.expand_dims(height_map, axis=0))
-    packages_data.append(normalize_packages(container.packages))
+    packages_data.append(normalize_packages(container))
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   packages_data = torch.tensor(np.stack(packages_data, axis=0), device=device)

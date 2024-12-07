@@ -130,7 +130,7 @@ class FullyConnectedNetwork(nn.Module):
 class PolicyValueNetwork(nn.Module):
   def __init__(self):
     super(PolicyValueNetwork, self).__init__()
-    self.residual_tower = ResidualTower(1, 39)
+    self.residual_tower = ResidualTower(1, 10)
     self.fully_connected_layer = FullyConnectedNetwork(action_count * 4, [128, 64, 32, 32, 32], 32)
     self.fc1 = nn.Linear(288, 144)
     self.fc2 = nn.Linear(144, 72)
@@ -151,20 +151,19 @@ class PolicyValueNetwork(nn.Module):
     value_output = self.value_head(x)
     return policy_output, value_output
 
-def train_policy_value_network(model, dataloader, device):
+def train_policy_value_network(model, trainloader, testloader, device):
   model.train()
 
-  learning_rate = 0.005
+  learning_rate = 1e-3
   epochs_count = 3
   momentum = 0.9
 
   criterion_policy = nn.CrossEntropyLoss()
   criterion_value = nn.MSELoss()
-  optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+  optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=1e-4)
   for epoch in range(epochs_count):
     epoch_loss = 0.0
-
-    for inputs in dataloader:
+    for inputs in trainloader:
       inputs = (tensor.to(device) for tensor in list(inputs))
       image_data, package_data, priors, reward = inputs
 
@@ -175,5 +174,21 @@ def train_policy_value_network(model, dataloader, device):
       optimizer.step()
       epoch_loss += loss.item()
 
-    avg_loss = epoch_loss / len(dataloader)
-    print(f"Epoch [{epoch+1}/{epochs_count}], Loss: {avg_loss:.4f}")
+    avg_loss = epoch_loss / len(trainloader)
+    print(f'Epoch [{epoch+1}/{epochs_count}], Loss: {avg_loss:.4f}')
+
+  if testloader == None:
+    return
+  
+  model.eval()
+  with torch.no_grad():
+    total_loss = 0.0
+    for inputs in testloader:
+      inputs = (tensor.to(device) for tensor in list(inputs))
+      image_data, package_data, priors, reward = inputs
+
+      predicted_priors, predicted_reward = model(image_data, package_data)
+      loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
+      total_loss += loss.item()
+    avg_loss = total_loss / len(testloader)
+    print(f'Loss on test: {avg_loss:.4f}')
