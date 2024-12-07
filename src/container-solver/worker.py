@@ -25,7 +25,7 @@ app = FastAPI()
 async def load_model(file: UploadFile = File(...)):
   content = await file.read()
   content = io.BytesIO(content)
-  policy_value_network.load_state_dict(torch.load(content, weights_only=True))
+  policy_value_network.load_state_dict(torch.load(content, weights_only=False))
   return PlainTextResponse(content='success')
 
 @app.post('/policy_value_inference')
