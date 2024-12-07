@@ -1,79 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Three.js ULD and Package Visualization</title>
     <script type="importmap">
-        { "imports": { "three": "https://cdn.skypack.dev/three@0.90.0/build/three.module" } }
+        {
+            "imports": {
+                "three": "https://cdn.skypack.dev/three@0.90.0/build/three.module"
+            }
+        }
     </script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            background-color: black;
+            /* Set background to black */
         }
+
         #button-container {
             position: absolute;
             top: 10px;
             left: 10px;
             z-index: 10;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            /* Transparent white for better contrast */
             color: white;
+            /* Text color to white */
             padding: 10px;
+            border-radius: 8px;
         }
-        button {
+
+        button,
+        input {
             font-size: 16px;
-            padding: 10px;
+            padding: 8px;
+            margin: 5px 0;
             cursor: pointer;
+            background-color: #555;
+            /* Dark gray for better contrast */
+            color: white;
+            /* Text color to white */
+            border: none;
+            border-radius: 5px;
         }
-        #binLabel {
+
+        button:hover,
+        input:hover {
+            background-color: #777;
+            /* Lighter gray on hover */
+        }
+
+        #binLabel,
+        #efficiencyLabel,
+        #centerOfMassLabel,
+        #priorityLabel {
             position: absolute;
-            top: 50px;
             left: 10px;
             z-index: 10;
             color: white;
+            /* Text color to white */
             font-size: 20px;
         }
+
+        #binLabel {
+            top: 120px;
+        }
+
+        #efficiencyLabel {
+            top: 160px;
+        }
+
+        #centerOfMassLabel {
+            top: 200px;
+        }
+
+        #priorityLabel {
+            top: 240px;
+        }
+
+        B {
+            position: absolute;
+            top: 500px;
+            padding: 10px;
+            color: white;
+            /* Text color to white */
+        }
     </style>
+
 </head>
+
 <body>
     <div id="button-container">
         <button id="nextBinButton">Next Bin</button>
         <button id="zoomInButton">Zoom In</button>
         <button id="zoomOutButton">Zoom Out</button>
+        <input type="file" id="fileUploader" accept=".txt" />
     </div>
     <div id="binLabel">Bin: </div>
+    <div id="efficiencyLabel">Packing Efficiency: </div>
+    <div id="centerOfMassLabel">Center of Mass: </div>
+    <div id="priorityLabel">Priority Packages: </div>
+    <B style="position: absolute; top: 500px; padding: 10px;">green axis is y and blue is z axis and height is along y
+        axis</B>
+    <B style="position: absolute; top: 520px; padding: 10px;">red boxes are priority and yellow ones are economy</B>
 
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from "https://unpkg.com/three@0.112/examples/jsm/controls/OrbitControls.js";
-    
-        fetch('output_data.json')
+
+
+        fetch('output_json.json')
             .then(response => response.json())
             .then(data => {
-                const output = data.pkg_positions.map((pkgPos, index) => {
+                let tempoutput = data.pkg_positions.map((pkgPos, index) => {
                     return {
-                        packageID: `Package-${index + 1}`,  // Generating a unique ID
-                        uldID: `ULD-${pkgPos.uld_id}`,
-                        isPriority: pkgPos.ispriority,
+                        pkgID: pkgPos.pkg_id,
+                        ispriority: pkgPos.ispriority,
                         weight: pkgPos.weight,
-                        x: pkgPos.x_min,
-                        y: pkgPos.y_min,
-                        z: pkgPos.z_min,
-                        xfin: pkgPos.x_max, 
-                        yfin: pkgPos.y_max,
-                        zfin: pkgPos.z_max
+                        cost: pkgPos.cost
                     };
                 });
 
-                // Calculate length, width, and height of each package
-                output.forEach(pkg => {
-                    pkg.length = pkg.xfin - pkg.x;
-                    pkg.width = pkg.yfin - pkg.y;
-                    pkg.height = pkg.zfin - pkg.z;
-                });
 
-                const ulds = {
+                let scene, camera, renderer, controls, gridHelper;
+                let output = [];
+                let ulds = {
                     "ULD-1": { length: 224, width: 318, height: 162, weight_limit: 2500 },
                     "ULD-2": { length: 224, width: 318, height: 162, weight_limit: 2500 },
                     "ULD-3": { length: 244, width: 318, height: 244, weight_limit: 2800 },
@@ -81,134 +135,291 @@
                     "ULD-5": { length: 244, width: 318, height: 285, weight_limit: 3500 },
                     "ULD-6": { length: 244, width: 318, height: 285, weight_limit: 3500 }
                 };
-
                 let currentBinIndex = 0;
                 let currentBinID = '';
 
-                function createBox(x0, y0, z0, length, width, height, color, transparent = false) {
-                    const geometry = new THREE.BoxGeometry(length, width, height);
-                    const material = new THREE.MeshStandardMaterial({ color, transparent, opacity: transparent ? 0.5 : 1, wireframe: false });
-                    const box = new THREE.Mesh(geometry, material);
-                    box.position.set(x0 + length / 2, y0 + width / 2, z0 + height / 2);
-                    return box;
+                function calculatePackingEfficiency(packageList, uldID) {
+                    const { length, width, height } = ulds[uldID];
+                    const totalVolume = length * width * height;
+                    const packageVolume = packageList.reduce((sum, pkg) => sum + (pkg.length * pkg.width * pkg.height), 0);
+                    return ((packageVolume / totalVolume) * 100).toFixed(2);
                 }
-    
-                function createTextLabel(text, x, y, z) {
-                    const loader = new THREE.FontLoader();
-                    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
-                        const geometry = new THREE.TextGeometry(text, {
-                            font: font,
-                            size: 5,
-                            height: 1
-                        });
-    
-                        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                        const textMesh = new THREE.Mesh(geometry, material);
-                        textMesh.rotation.y = Math.PI;
-                        geometry.computeBoundingBox();
-                        const bbox = geometry.boundingBox;
-                        const centerX = (bbox.max.x - bbox.min.x) / 2;
-                        textMesh.position.set(x - centerX, y, z);
-                        scene.add(textMesh);
+
+                function calculateWeightEfficiency(packageList, uldID) {
+                    const totalWeight = packageList.reduce((sum, pkg) => {
+                        const weight = tempoutput.find(temp => temp.pkgID === pkg.pkgID)?.weight || 0;
+                        return sum + weight;
+                    }, 0);
+                    return ((totalWeight / ulds[uldID].weight_limit) * 100).toFixed(2);
+                }
+
+
+                function calculateCenterOfMass(packageList, uldID) {
+                    let totalWeight = 0;
+                    let weightedX = 0, weightedY = 0, weightedZ = 0;
+
+                    packageList.forEach(pkg => {
+                        const weight = tempoutput.find(temp => temp.pkgID === pkg.pkgID)?.weight || 1; // Default weight as 1
+                        totalWeight += weight;
+                        weightedX += weight * (pkg.x + pkg.length / 2);
+                        weightedY += weight * (pkg.y + pkg.width / 2);
+                        weightedZ += weight * (pkg.z + pkg.height / 2);
                     });
+
+                    return {
+                        x: (((weightedX / totalWeight).toFixed(2)) / ulds[uldID].length).toFixed(2),
+                        y: ((weightedY / totalWeight).toFixed(2) / ulds[uldID].width).toFixed(2),
+                        z: ((weightedZ / totalWeight).toFixed(2) / ulds[uldID].height).toFixed(2)
+                    };
                 }
-    
-                const scene = new THREE.Scene();
-                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                const renderer = new THREE.WebGLRenderer();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                document.body.appendChild(renderer.domElement);
-                const controls = new OrbitControls(camera, renderer.domElement);
-    
-                camera.position.set(0, 100, 300); 
 
-                const light = new THREE.PointLight(0xffffff, 1, 1000);
-                light.position.set(0, 50, 100); 
-                camera.add(light); 
-                const ambientLight = new THREE.AmbientLight(0x404040);
-                scene.add(ambientLight);
+                function parseTextToJson(text) {
+                    const lines = text.split('\n').filter(line => line.trim() !== '');
+                    const pkg_positions = lines.map((line, index) => {
+                        const values = line.split(',');
+                        if (values.length !== 8) {
+                            console.error(`Invalid line skipped: ${line}`);
+                            return null;
+                        }
+                        const pkgId = parseInt(values[0].substr(2), 10);
+                        const uldId = parseInt(values[1].substr(1), 10); //console.log(uldId);
+                        return {
+                            pkgId: pkgId,
+                            uld_id: values[1] === 'NONE' ? null : uldId,
+                            x_min: values[1] === 'NONE' ? null : parseInt(values[2], 10),
+                            y_min: values[1] === 'NONE' ? null : parseInt(values[3], 10),
+                            z_min: values[1] === 'NONE' ? null : parseInt(values[4], 10),
+                            x_max: values[1] === 'NONE' ? null : parseInt(values[5], 10),
+                            y_max: values[1] === 'NONE' ? null : parseInt(values[6], 10),
+                            z_max: values[1] === 'NONE' ? null : parseInt(values[7], 10),
+                        };
+                    }).filter(pkg => pkg !== null);
 
-                scene.add(camera);
-    
-                const gridHelper = new THREE.GridHelper(500, 10);
-                scene.add(gridHelper);
-    
-                function createBoxWithBorder(x0, y0, z0, length, width, height, color, borderColor, transparent = false) {
+                    return { pkg_positions };
+                }
+
+                function handleFileUpload(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            const text = e.target.result;
+                            const json = parseTextToJson(text);
+
+                            // Log the parsed JSON to the console
+                            console.log("Parsed JSON:", json);
+
+                            output = json.pkg_positions.map((pkgPos, index) => ({
+                                pkgID: pkgPos.pkgId,
+                                uldID: `ULD-${pkgPos.uld_id}`,
+                                x: pkgPos.x_min,
+                                y: pkgPos.y_min,
+                                z: pkgPos.z_min,
+                                xfin: pkgPos.x_max,
+                                yfin: pkgPos.y_max,
+                                zfin: pkgPos.z_max,
+                                length: pkgPos.x_max - pkgPos.x_min,
+                                width: pkgPos.y_max - pkgPos.y_min,
+                                height: pkgPos.z_max - pkgPos.z_min
+                            }));
+
+                            console.log("Formatted Output JSON:", output);
+
+                            currentBinIndex = 0;
+                            currentBinID = Object.keys(ulds)[currentBinIndex];
+                            const initialPackageList = output.filter(pkg => pkg.uldID === currentBinID);
+                            visualizeBin(currentBinID, initialPackageList);
+                        };
+                        reader.readAsText(file);
+                    }
+                }
+
+                function createBox(x, z, y, length, height, width, isPriority, opacity = 1, pkgID) {
+                    // Generate a random color for non-priority boxes
+
+                    let randomColor = "#D5FFFF";
+                    while (randomColor == "#D5FFFF") randomColor = Math.random() * 0xffffff;
+                    let color = 0 ? "#D5FFFF" : randomColor; // Red for priority, random color for others
+                    let textcolor = color;
+
+                    // Ensure priority boxes are fully opaque
+
+                    const finalOpacity = isPriority ? 0.5 : opacity;
+                    const material = new THREE.MeshBasicMaterial({
+                        color,
+                        transparent: true,
+                        opacity: 0.65,
+                    });
+
                     const geometry = new THREE.BoxGeometry(length, width, height);
-                    const material = new THREE.MeshStandardMaterial({ color, transparent, opacity: transparent ? 0.5 : 1, wireframe: false });
+
+                    if (opacity < 1) {
+                        const box = new THREE.Mesh(geometry, material);
+                        const edges = new THREE.EdgesGeometry(geometry);
+                        const lineMaterial = new THREE.LineBasicMaterial({ color: "#FFFEB3", linewidth: 10 }); // Thicker lines
+                        const line = new THREE.LineSegments(edges, lineMaterial);
+                        line.position.set(x + length / 2, y + width / 2, z + height / 2);
+                        scene.add(line);
+
+                        return;
+                    }
                     const box = new THREE.Mesh(geometry, material);
-                    box.position.set(x0 + length / 2, y0 + width / 2, z0 + height / 2);
+                    box.position.set(x + length / 2, y + width / 2, z + height / 2);
+                    scene.add(box);
+
+                    // Add edges to the box for a border effect
                     const edges = new THREE.EdgesGeometry(geometry);
-                    const edgeMaterial = new THREE.LineBasicMaterial({ color: borderColor });
-                    const edgeLines = new THREE.LineSegments(edges, edgeMaterial);
-                    box.add(edgeLines);
-                    return box;
+                    if (isPriority) color = "#D5FFFF";
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 1000 }); // Black border
+                    const line = new THREE.LineSegments(edges, lineMaterial);
+                    line.position.set(x + length / 2, y + width / 2, z + height / 2);
+                    scene.add(line);
+
+                    //                 if (isPriority) {
+                    // Add "P" text on each side of the priority box
+                    // console.log(isPriority);
+                    // const loader = new THREE.FontLoader();
+                    // const defaultFontURL = 'https://threejs.org/examples/fonts/droid/droid_sans_bold.typeface.json'; // Default font URL
+                    // loader.load(defaultFontURL, function (font) {
+                    //     const textGeometry = new THREE.TextGeometry(`${pkgID}`, {
+                    //         font: font,
+                    //         size: 5,  // Adjust size as needed
+                    //         height: 1,
+                    //         curveSegments: 12,
+                    //     });
+
+                    //     const textMaterial = new THREE.MeshBasicMaterial({ color: textcolor });
+                    //     const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+
+                    //     // Position text on each side of the box
+                    //     const positions = [
+                    //         { x: x + length / 2, y: y + width / 2, z: z, rotation: new THREE.Vector3(0, -Math.PI, 0) }, // Front
+                    //         { x: x , y: y + width / 2, z: z + height / 2, rotation: new THREE.Vector3(0, -Math.PI/2, 0) }, // Back
+                    //         { x: x + length / 2, y: y, z: z + height / 2, rotation:new THREE.Vector3(Math.PI / 2,  0, Math.PI / 2) }, // Right
+                    //         { x: x + length / 2, y: y + width / 2, z: z + height, rotation: new THREE.Vector3(0, 0, 0) }, // Left
+                    //         { x: x + length , y: y + width / 2, z: z + height / 2, rotation: new THREE.Vector3(0, 0, 0) }, // Top
+                    //         { x: x + length / 2, y: y + width, z: z + height / 2, rotation: new THREE.Vector3(Math.PI / 2,  -Math.PI, Math.PI / 2) }, // Bottom
+                    //     ];
+
+                    //     positions.forEach(pos => {
+                    //         const textClone = textMesh.clone();
+                    //         textClone.position.set(pos.x, pos.y, pos.z);
+
+                    //         // Rotate the text to be normal to the corresponding face of the box
+                    //         textClone.rotation.set(pos.rotation.x, pos.rotation.y, pos.rotation.z);
+
+                    //         scene.add(textClone);
+                    //     });
+                    // });
+                    // }
+
                 }
-    
+
+
+                function addCoordinateAxes(length, width, height) {
+                    const arrowLength = Math.max(length, width, height) / 2;
+
+                    const xArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), arrowLength, 0xff0000);
+                    const yArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), arrowLength, 0x00ff00);
+                    const zArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), arrowLength, 0x0000ff);
+
+                    scene.add(xArrow);
+                    scene.add(yArrow);
+                    scene.add(zArrow);
+                }
+
                 function visualizeBin(uldID, packageList) {
-                    while (scene.children.length) {
+                    while (scene.children.length > 0) {
                         scene.remove(scene.children[0]);
                     }
-                    scene.add(light);
-                    scene.add(ambientLight);
                     scene.add(gridHelper);
-                
+
                     const { length, width, height } = ulds[uldID];
-                    const binColor = new THREE.Color(0xffffff);
-                    const bin = createBox(0, 0, 0, length, width, height, binColor, true);
-                    scene.add(bin);
-                
+                    createBox(0, 0, 0, length, width, height, false, 0.2);
+
+
+                    let priorityCount = 0;
                     packageList.forEach(pkg => {
-                        const { x, y, z, length, width, height, packageID, isPriority, weight } = pkg;
-
-                        const packageColor = isPriority ? new THREE.Color(0xff0000) : new THREE.Color(0x3399ff);  // Blue for Economic
-                        const borderColor = new THREE.Color(0xff0000);  // Red for border
-
-                        // Visualize the package
-                        const flippedPackageBox = createBoxWithBorder(x, y, z, length, width, height, packageColor, borderColor);
-                        scene.add(flippedPackageBox);
-
-                        // Create text label for the package
-                        createTextLabel(`${packageID} (W: ${weight})`, x + length / 2, y + height / 2, z);
+                        let temp = tempoutput.filter(tt => tt.pkgID === pkg.pkgID);
+                        if (temp[0].ispriority) priorityCount++;
+                        createBox(pkg.x, pkg.y, pkg.z, pkg.length, pkg.width, pkg.height, temp[0].ispriority, 1, pkg.pkgID);
                     });
-                
-                    createTextLabel(`Bin: ${uldID}`, length, width + 10, 0);
+
+                    const packingEfficiency = calculatePackingEfficiency(packageList, uldID);
+                    const weightEfficiency = calculateWeightEfficiency(packageList, uldID);
+                    const centerOfMass = calculateCenterOfMass(packageList, uldID);
+
                     document.getElementById("binLabel").innerText = `Bin: ${uldID}`;
-                    camera.position.set(0, 200, 500);
+                    document.getElementById("efficiencyLabel").innerText = `Packing Efficiency: ${packingEfficiency}%, Weight Efficiency: ${weightEfficiency}%`;
+                    document.getElementById("centerOfMassLabel").innerText = `Center of Mass: (${centerOfMass.x}, ${centerOfMass.y}, ${centerOfMass.z})`;
+                    document.getElementById("priorityLabel").innerText = `Priority Packages: ${priorityCount}`; // Update the priority count label
+
+                    addCoordinateAxes(5 * length, 5 * width, 5 * height);
                     controls.update();
                 }
 
-                document.getElementById("nextBinButton").addEventListener("click", function () {
+                function initScene() {
+                    scene = new THREE.Scene();
+                    scene.background = new THREE.Color(0x000000); // Set the background to black
+
+                    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    renderer = new THREE.WebGLRenderer({ antialias: true });
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    document.body.appendChild(renderer.domElement);
+
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Slightly dimmer ambient light
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                    directionalLight.position.set(200, 300, 400);
+                    scene.add(ambientLight, directionalLight);
+
+                    camera.position.set(0, 200, 500);
+                    controls = new OrbitControls(camera, renderer.domElement);
+                    controls.update();
+
+                    // Create an infinite grid helper
+                    const gridHelperSize = 10000; // Extend size for a large grid
+                    const gridDivisions = 500; // Increase grid divisions for a dense grid
+                    gridHelper = new THREE.GridHelper(gridHelperSize, gridDivisions, "#3B567D", "#3B567D"); // Grey lines for the grid
+                    gridHelper.material.opacity = 1 // Make it slightly transparent
+                    gridHelper.material.transparent = true; // Enable transparency
+                    scene.add(gridHelper);
+                }
+
+                initScene();
+
+                document.getElementById("nextBinButton").addEventListener("click", () => {
                     currentBinIndex = (currentBinIndex + 1) % Object.keys(ulds).length;
                     currentBinID = Object.keys(ulds)[currentBinIndex];
                     const currentPackageList = output.filter(pkg => pkg.uldID === currentBinID);
                     visualizeBin(currentBinID, currentPackageList);
                 });
-    
-                document.getElementById("zoomInButton").addEventListener("click", function () {
+
+                document.getElementById("zoomInButton").addEventListener("click", () => {
                     camera.position.z -= 50;
                     controls.update();
                 });
-    
-                document.getElementById("zoomOutButton").addEventListener("click", function () {
+
+                document.getElementById("zoomOutButton").addEventListener("click", () => {
                     camera.position.z += 50;
                     controls.update();
                 });
-    
-                currentBinID = Object.keys(ulds)[currentBinIndex];
-                const initialPackageList = output.filter(pkg => pkg.uldID === currentBinID);
-                visualizeBin(currentBinID, initialPackageList);
-    
+
+                document.getElementById("fileUploader").addEventListener("change", handleFileUpload);
+
                 function animate() {
                     requestAnimationFrame(animate);
                     renderer.render(scene, camera);
                 }
-    
+
                 animate();
+
+
+
             })
             .catch(error => {
                 console.error("Error loading JSON data:", error);
             });
     </script>
 </body>
+
 </html>
