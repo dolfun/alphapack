@@ -88,7 +88,7 @@ def generate_training_data(
   data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
     container_height = 24
-    packages = [random_package() for _ in range(Container.action_count)]
+    packages = [random_package() for _ in range(Container.package_count)]
     container = Container(container_height, packages)
 
     baseline_reward = calculate_baseline_reward(container, addresses)
@@ -144,10 +144,10 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     pass
 
   with open(episodes_file_path, 'ab') as file:
-    games_per_iteration = 2
-    simulations_per_move = 4
+    games_per_iteration = 8
+    simulations_per_move = 64
     c_puct = 5.0
-    virtual_loss = 5
+    virtual_loss = 3
     thread_count = 16
     batch_size = 4
     generate_training_data(

@@ -24,6 +24,8 @@ concept InferenceQueueConcept = requires(const State& state, InferenceQueue& inf
   { std::as_const(inference_queue).batch_size() } -> std::same_as<size_t>;
   { inference_queue.enqueue(state) } -> std::same_as<std::future<InferenceResult_t>>;
   { inference_queue.flush() } -> std::same_as<void>;
+  { inference_queue.size() } -> std::same_as<size_t>;
+  { std::as_const(inference_queue).batch_size() } -> std::same_as<size_t>;
 };
 
 template <StateConcept State>

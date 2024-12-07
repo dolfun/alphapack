@@ -55,6 +55,7 @@ PYBIND11_MODULE(container_solver, m) {
     .def("unserialize", &Container::unserialize)
 
     .def_readonly_static("action_count", &Container::action_count)
+    .def_readonly_static("package_count", &Container::package_count)
     .def_readonly_static("length", &Container::length)
     .def_readonly_static("width", &Container::width)
 

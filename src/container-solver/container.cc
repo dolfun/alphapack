@@ -2,6 +2,7 @@
 #include <map>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
 
 glm::ivec3 get_shape_along_axes(glm::ivec3 shape, int orientation) {
   static constexpr int ORIENTATIONS[6][3] = {
@@ -89,26 +90,12 @@ auto Container::height_map() const noexcept -> const Array2D<int>& {
 
 auto Container::possible_actions() const -> std::vector<int> {
   std::vector<int> actions;
-
-  for (int i = 0; i < std::ssize(m_packages); ++i) {
-    const auto& pkg = m_packages[i];
-    if (pkg.is_placed) continue;
-
-    for (int orientation = 5; orientation >= 0; --orientation) {
-      bool to_exit = false;
-      auto mask = get_valid_state_mask(pkg, orientation);
-      for (int x = 0; x < mask.rows(); ++x) {
-        for (int y = 0; y < mask.cols(); ++y) {
-          if (mask(x, y) >= 0) {
-            glm::ivec3 pos = { x, y, mask(x, y) };
-            actions.push_back(i);
-            to_exit = true;
-            break;
-          }
-        }
-        if (to_exit) break;
+  auto mask = get_valid_state_mask(m_packages.front());
+  for (int x = 0; x < mask.rows(); ++x) {
+    for (int y = 0; y < mask.cols(); ++y) {
+      if (mask(x, y) >= 0) {
+        actions.push_back(x * mask.cols() + y);
       }
-      if (to_exit) break;
     }
   }
 
@@ -117,17 +104,14 @@ auto Container::possible_actions() const -> std::vector<int> {
 
 void Container::transition(int action_idx) {
   assert(action_idx >= 0 && action_idx < Container::action_count);
-  auto& pkg = m_packages[action_idx];
-  for (int orientation = 5; orientation >= 0; --orientation) {
-    auto mask = get_valid_state_mask(pkg, orientation);
-    for (int x = 0; x < mask.rows(); ++x) {
-      for (int y = 0; y < mask.cols(); ++y) {
-        if (mask(x, y) >= 0) {
-          glm::ivec3 pos = { x, y, mask(x, y) };
-          place_package(pkg, pos, orientation);
-          return;
-        }
-      }
+  auto shape = m_packages.front().shape;
+  m_packages.front().is_placed = true;
+  std::rotate(m_packages.begin(), m_packages.begin() + 1, m_packages.end());
+  int x0 = action_idx / Container::width, y0 = action_idx % Container::width;
+  for (int x = x0; x < x0 + shape.x; ++x) {
+    for (int y = y0; y < y0 + shape.y; ++y) {
+      m_height_map(x, y) += shape.z;
+      assert(m_height_map(x, y) <= m_height);
     }
   }
 }
@@ -144,7 +128,7 @@ float Container::reward() const noexcept {
 auto Container::serialize() const noexcept -> std::string {
   std::pair<const void*, size_t> infos[] = {
     { &m_height, sizeof(int) },
-    { &m_packages[0], sizeof(Package) * action_count },
+    { &m_packages[0], sizeof(Package) * package_count },
     { &m_height_map(0, 0), sizeof(int) * length * width }
   };
 
@@ -164,12 +148,12 @@ auto Container::serialize() const noexcept -> std::string {
 
 Container Container::unserialize(const std::string& bytes) {
   int height;
-  std::vector<Package> packages(action_count);
+  std::vector<Package> packages(package_count);
   Array2D<int> height_map(length, width);
 
   std::pair<void*, size_t> infos[] = {
     { &height, sizeof(int) },
-    { &packages[0], sizeof(Package) * action_count },
+    { &packages[0], sizeof(Package) * package_count },
     { &height_map(0, 0), sizeof(int) * length * width }
   };
 
@@ -182,35 +166,20 @@ Container Container::unserialize(const std::string& bytes) {
   return Container(height, std::move(packages), std::move(height_map));
 }
 
-auto Container::get_valid_state_mask(const Package& pkg, int orientation) const noexcept -> Array2D<int> {
+auto Container::get_valid_state_mask(const Package& pkg) const noexcept -> Array2D<int> {
   Array2D<int> mask { Container::length, Container::width, -1 };
-  auto shape = get_shape_along_axes(pkg.shape, orientation);
-  auto max_height_freq = get_max_freq_in_window(m_height_map, shape);
-  for (std::size_t x = 0; x <= mask.rows() - shape.x; ++x) {
-    for (std::size_t y = 0; y <= mask.cols() - shape.y; ++y) {
+  auto max_height_freq = get_max_freq_in_window(m_height_map, pkg.shape);
+  for (std::size_t x = 0; x <= mask.rows() - pkg.shape.x; ++x) {
+    for (std::size_t y = 0; y <= mask.cols() - pkg.shape.y; ++y) {
       auto [max_height, freq] = max_height_freq(x, y);
-      if (max_height + shape.z > m_height) continue;
+      if (max_height + pkg.shape.z > m_height) continue;
 
-      float min_base_contact_ratio = 0.75f;
-      float base_contact_ratio = static_cast<float>(freq) / (shape.x * shape.y);
+      float min_base_contact_ratio = 0.50f;
+      float base_contact_ratio = static_cast<float>(freq) / (pkg.shape.x * pkg.shape.y);
       if (base_contact_ratio >= min_base_contact_ratio) {
         mask(x, y) = max_height;
       }
     }
   }
   return mask;
-}
-
-void Container::place_package(Package& pkg, glm::ivec3 pos, int orientation) noexcept {
-  assert(!pkg.is_placed);
-  pkg.is_placed = true;
-  pkg.shape = get_shape_along_axes(pkg.shape, orientation);
-  pkg.pos = pos;
-
-  auto pos2 = pkg.pos + pkg.shape;
-  for (int x = pkg.pos.x; x < pos2.x; ++x) {
-    for (int y = pkg.pos.y; y < pos2.y; ++y) {
-      m_height_map(x, y) = pos2.z;
-    }
-  }
 }

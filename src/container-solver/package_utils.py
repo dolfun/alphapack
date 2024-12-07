@@ -2,19 +2,11 @@ from random import random, randint
 from container_solver import Container, Package, Vec3i
 import numpy as np
 
-class GenerateInfo:
-  dims_range = (4, 8)
-  weight_range = (5, 10)
-  priority_ratio = 0.25
-  cost_range = (5, 50)
-
 def random_package():
+  dims_range = (4, 8)
   pkg = Package()
-  shape = sorted(randint(*GenerateInfo.dims_range) for i in range(3))
-  pkg.shape = Vec3i(shape[0], shape[1], shape[2])
-  pkg.weight = randint(*GenerateInfo.weight_range)
-  pkg.is_priority = True if random() < GenerateInfo.priority_ratio else False
-  pkg.cost = randint(*GenerateInfo.cost_range)
+  shape = (randint(*dims_range) for _ in range(3))
+  pkg.shape = Vec3i(*shape)
   return pkg
 
 def normalize_packages(container: Container):

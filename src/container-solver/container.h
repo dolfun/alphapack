@@ -18,15 +18,14 @@ public:
   auto serialize() const noexcept -> std::string;
   static Container unserialize(const std::string&);
 
-  static constexpr size_t action_count = 32;
   static constexpr int length = 16;
   static constexpr int width = 16;
+  static constexpr size_t action_count = length * width;
+  static constexpr size_t package_count = 32;
 
 private:
   Container(int, std::vector<Package>&&, Array2D<int>&&);
-
-  auto get_valid_state_mask(const Package&, int) const noexcept -> Array2D<int>;
-  void place_package(Package&, glm::ivec3, int) noexcept;
+  auto get_valid_state_mask(const Package&) const noexcept -> Array2D<int>;
 
   int m_height;
   std::vector<Package> m_packages;
