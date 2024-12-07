@@ -84,4 +84,11 @@ PYBIND11_MODULE(container_solver, m) {
     py::arg("batch_size"),
     py::arg("addresses")
   );
+
+  m.def(
+    "calculate_baseline_reward",
+    &calculate_baseline_reward,
+    py::arg("container"),
+    py::arg("addresses")
+  );
 }

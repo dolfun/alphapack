@@ -154,8 +154,8 @@ class PolicyValueNetwork(nn.Module):
 def train_policy_value_network(model, dataloader, device):
   model.train()
 
-  learning_rate = 0.05
-  epochs_count = 5
+  learning_rate = 0.005
+  epochs_count = 3
   momentum = 0.9
 
   criterion_policy = nn.CrossEntropyLoss()

@@ -1,4 +1,4 @@
-from container_solver import Container, generate_episode
+from container_solver import Container, generate_episode, calculate_baseline_reward
 from policy_value_network import PolicyValueNetwork, train_policy_value_network
 from package_utils import random_package, normalize_packages
 
@@ -76,12 +76,18 @@ def generate_training_data(
     games_per_iteration, simulations_per_move, 
     c_puct, virtual_loss, thread_count, batch_size, 
     addresses, episodes_file):
-  rewards = []
+  baseline_rewards = []
+  mcts_rewards = []
+  relative_rewards = [0, 0]
+
   data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
     container_height = 24
     packages = [random_package() for _ in range(Container.action_count)]
     container = Container(container_height, packages)
+
+    baseline_reward = calculate_baseline_reward(container, addresses)
+    baseline_rewards.append(baseline_reward)
 
     episode = generate_episode(
       container, simulations_per_move, 
@@ -89,14 +95,24 @@ def generate_training_data(
       batch_size, addresses
     )
     data_points_count += len(episode)
-    rewards.append(episode[-1].reward)
+
+    mcts_reward = episode[-1].reward
+    mcts_rewards.append(mcts_reward)
+
+    relative_reward = (+1 if mcts_reward > baseline_reward else -1)
+    relative_rewards[relative_reward] += 1
 
     for state_evaluation in episode:
+      state_evaluation.reward = relative_reward
       save_state_evaluation(state_evaluation, episodes_file)
 
   print(f'{data_points_count} data points generated')
-  rewards = np.array(rewards)
-  print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.2}')
+
+  baseline_rewards = np.array(baseline_rewards)
+  mcts_rewards = np.array(mcts_rewards)
+  print(f'Average baseline reward: {baseline_rewards.mean():.2} ± {baseline_rewards.std() * 100:.2}%')
+  print(f'Average MCTS reward: {mcts_rewards.mean():.2} ± {mcts_rewards.std() * 100:.2}%')
+  print(f'Relative Rewards -> (-{relative_rewards[0]}, +{relative_rewards[1]})')
 
 def perform_iteration(model_path, addresses, episodes_file_path, generate_only=False):
   # Create model if it does not exist
@@ -105,13 +121,17 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     torch.save(policy_value_network.state_dict(), model_path)
 
   # Uploaad model to all workers
+  print('UPLOADING MODELS:')
   with open(model_path, 'rb') as model:
     for address in addresses:
       model.seek(0)
       files = { 'file': model }
       response = requests.post('http://' + address + '/policy_value_upload', files=files)
-      if response.text != 'success':
+      if response.text == 'success':
+        print(f'Model uploaded successfully to {address}')
+      else:
         raise Exception(f'Model upload failed on worker: {address}')
+  print()
 
   # Generate Games
   print('GENERATING GAMES:')
@@ -119,12 +139,12 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     pass
 
   with open(episodes_file_path, 'ab') as file:
-    games_per_iteration = 32
-    simulations_per_move = 16
+    games_per_iteration = 2
+    simulations_per_move = 4
     c_puct = 5.0
-    virtual_loss = 3
+    virtual_loss = 5
     thread_count = 16
-    batch_size = 4
+    batch_size = 8
     generate_training_data(
       games_per_iteration, simulations_per_move, 
       c_puct, virtual_loss, thread_count, batch_size, 
@@ -142,8 +162,8 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
   print(f'{len(dataset)} data points loaded')
 
   model = PolicyValueNetwork().to(device)
-  model.load_state_dict(torch.load(model_path, weights_only=True))
-  dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+  model.load_state_dict(torch.load(model_path, weights_only=False))
+  dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
   train_policy_value_network(model, dataloader, device)
   torch.save(model.state_dict(), model_path)
   print()
