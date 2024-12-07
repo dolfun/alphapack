@@ -1,12 +1,12 @@
 #pragma once
+#include <cmath>
 #include <atomic>
 #include <thread>
-#include <cmath>
 #include <vector>
 #include <future>
+#include <ranges>
 #include <utility>
 #include <semaphore>
-#include <ranges>
 
 namespace mcts {
 
