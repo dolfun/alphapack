@@ -8,6 +8,14 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if device != 'cuda':
+  try:
+    import torch_directml
+    device = torch_directml.device()
+  except ImportError:
+    pass
+
 import requests
 import pickle
 import argparse
@@ -112,7 +120,7 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
 
   with open(episodes_file_path, 'ab') as file:
     games_per_iteration = 32
-    simulations_per_move = 64
+    simulations_per_move = 16
     c_puct = 5.0
     virtual_loss = 3
     thread_count = 16
@@ -133,10 +141,10 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
   dataset = ExperienceReplay(episodes_file_path)
   print(f'{len(dataset)} data points loaded')
 
-  model = PolicyValueNetwork()
+  model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=True))
   dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
-  train_policy_value_network(model, dataloader)
+  train_policy_value_network(model, dataloader, device)
   torch.save(model.state_dict(), model_path)
   print()
 

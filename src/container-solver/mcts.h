@@ -6,6 +6,7 @@
 #include <future>
 #include <utility>
 #include <semaphore>
+#include <ranges>
 
 namespace mcts {
 
@@ -31,8 +32,8 @@ struct Node {
 
   std::unique_ptr<State> state = nullptr;
   std::weak_ptr<Node> prev_node;
-
-  std::atomic<bool> evaluating = false, evaluated = false;
+  
+  std::atomic<bool> visited = false, evaluated = false;
   std::atomic<int> unvisited_leaf_count = 1;
   std::atomic<int> action_idx = -1;
   std::atomic<int> visit_count = 0;
@@ -53,14 +54,7 @@ bool run_mcts_simulation(
   std::atomic<int>& simulation_count, int max_simulations) {
   // Selection
   std::vector<NodePtr<State>> search_path { node };
-  auto apply_virtual_loss = [&search_path] (int virtual_loss) {
-    for (auto node : search_path) {
-      node->visit_count += virtual_loss;
-      node->total_action_value -= virtual_loss;
-    }
-  };
-
-  while (node->visit_count > 0) {
+  while (node->visited) {
     if (!node->evaluated) return false;
     if (node->children.empty()) return true;
 
@@ -86,13 +80,15 @@ bool run_mcts_simulation(
     search_path.push_back(node);
   }
 
-  // Discard threads expanding the same node
-  auto prev_evaluating = node->evaluating.exchange(true);
-  if (prev_evaluating) return false;
-
-  // Apply virtual loss
-  apply_virtual_loss(virtual_loss);
+  auto old_visited_value = node->visited.exchange(true);
+  if (old_visited_value) return false;
   
+  // Apply virtual loss
+  for (auto node : search_path) {
+    node->visit_count += virtual_loss;
+    node->total_action_value -= virtual_loss;
+  }
+
   // Lazy State Update
   if (node->state == nullptr) {
     auto prev_node = node->prev_node.lock();
@@ -100,13 +96,10 @@ bool run_mcts_simulation(
     node->state->transition(node->action_idx);
   }
 
-  // Async Evaluation
+  // Enqueue for async evaluation
   auto evaluator_result = inference_queue.enqueue(*node->state);
-  bool b1 = max_simulations - simulation_count <= inference_queue.batch_size();
-  bool b2 = search_path[0]->unvisited_leaf_count <= inference_queue.batch_size();
-  if (b1 || b2) {
-    auto thread = std::thread(&InferenceQueue::flush, &inference_queue);
-    thread.detach();
+  if (search_path[0]->unvisited_leaf_count <= inference_queue.batch_size()) {
+    inference_queue.flush();
   }
 
   // Expansion
@@ -131,14 +124,12 @@ bool run_mcts_simulation(
 
   // Backpropagation
   int action_count = actions.size();
-  for (auto node : search_path) {
-    node->evaluating = false;
-    node->evaluated = true;
+  for (auto node : std::ranges::views::reverse(search_path)) {
+    node->visit_count += 1 - virtual_loss;
+    node->total_action_value += value + virtual_loss;
     node->unvisited_leaf_count += action_count - 1;
-    ++node->visit_count;
-    node->total_action_value += value;
+    node->evaluated = true;
   }
-  apply_virtual_loss(-virtual_loss);
 
   return true;
 }
@@ -160,6 +151,16 @@ auto generate_episode(
   float c_puct, int virtual_loss, int thread_count, 
   InferenceQueue& inference_queue)
     -> std::vector<Evaluation<State>> {
+
+  std::atomic<bool> to_end = false;
+  std::jthread inference_queue_daemon {[&] {
+    while (!to_end) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      if (inference_queue.size() < inference_queue.batch_size()) {
+        inference_queue.flush();
+      }
+    }
+  }};
 
   std::vector<Evaluation<State>> state_evaluations;
   auto node = std::make_shared<Node<State>>();
@@ -185,9 +186,6 @@ auto generate_episode(
       launched_semaphore.acquire();
       threads.emplace_back(std::move(thread));
     }
-    
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // ;=D
-    inference_queue.flush();
 
     for (auto& thread : threads) {
       thread.join();
@@ -220,6 +218,7 @@ auto generate_episode(
     evaluation.reward = reward;
   }
 
+  to_end = true;
   return state_evaluations;
 }
 

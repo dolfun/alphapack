@@ -1,7 +1,6 @@
 #include "episode_generator.h"
 #include <cpr/cpr.h>
 #include <cstring>
-#include <thread>
 #include <queue>
 #include <mutex>
 #include <future>
@@ -13,16 +12,25 @@ public:
   InferenceQueue(size_t batch_size, const std::vector<std::string>& _addresses)
    : m_batch_size { batch_size }, addresses { _addresses }, worker_use_count(addresses.size()) {}
 
+  size_t size() noexcept { 
+    std::lock_guard<std::mutex> lock_guard { inference_queue_mutex };
+    return inference_queue.size();
+   }
+
   size_t batch_size() const noexcept { return m_batch_size; }
 
   auto enqueue(const State& state) -> std::future<InferenceResult_t> {
-    std::lock_guard<std::mutex> lock_guard { inference_queue_mutex };
     std::promise<InferenceResult_t> promise;
     auto future = promise.get_future();
-    inference_queue.emplace(state, std::move(promise));
-    if (inference_queue.size() >= m_batch_size) {
-      auto thread = std::thread(&InferenceQueue::flush, this);
-      thread.detach();
+    bool to_flush;
+    {
+      std::lock_guard<std::mutex> lock_guard { inference_queue_mutex };
+      inference_queue.emplace(state, std::move(promise));
+      to_flush = (inference_queue.size() >= m_batch_size);
+    }
+
+    if (to_flush) {
+      flush();
     }
 
     return future;
@@ -49,9 +57,8 @@ public:
       { "Content-Type", "application/octet-stream" }
     };
     cpr::Body body { &data[0], data.size() };
-    auto result = cpr::PostAsync(url, header, body);
-
-    auto text = result.get().text;
+    auto response = cpr::Post(url, header, body);
+    auto text = response.text;
     const char* ptr = &text[0];
     for (auto& promise : promises) {
       std::vector<float> priors(State::action_count);
@@ -64,7 +71,6 @@ public:
 
       promise.set_value(std::make_pair(priors, value));
     }
-    return;
   }
 
 private:

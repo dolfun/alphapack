@@ -10,7 +10,15 @@ import torch
 
 import io
 
-policy_value_network = PolicyValueNetwork()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if device != 'cuda':
+  try:
+    import torch_directml
+    device = torch_directml.device()
+  except ImportError:
+    pass
+  
+policy_value_network = PolicyValueNetwork().to(device)
 app = FastAPI()
 
 @app.post('/policy_value_upload')
@@ -25,7 +33,7 @@ async def root(request: Request):
   data = await request.body()
   
   batch_size = int(request.headers['batch-size'])
-  # if batch_size > 1: print(f'Inference for batch size {batch_size} received!')
+  if batch_size > 1: print(f'Inference for batch size {batch_size} received!')
 
   image_data = []
   packages_data = []
@@ -36,11 +44,12 @@ async def root(request: Request):
     image_data.append(np.expand_dims(height_map, axis=0))
     packages_data.append(normalize_packages(container.packages))
   
-  image_data = torch.tensor(np.stack(image_data, axis=0))
-  packages_data = torch.tensor(np.stack(packages_data, axis=0))
+  image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
+  packages_data = torch.tensor(np.stack(packages_data, axis=0), device=device)
   with torch.no_grad():
     policy, value = policy_value_network.forward(image_data, packages_data)
     policy = torch.softmax(policy, dim=1)
     result = torch.cat((policy, value), dim=1)
 
-    return Response(content=result.numpy().tobytes(), media_type='application/octet-stream')
+    result = result.cpu().numpy()
+    return Response(content=result.tobytes(), media_type='application/octet-stream')

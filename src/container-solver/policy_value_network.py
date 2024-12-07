@@ -43,7 +43,7 @@ class PolicyValueNetwork(nn.Module):
 
     return policy_output, value_output
 
-def train_policy_value_network(model, dataloader):
+def train_policy_value_network(model, dataloader, device):
   model.train()
 
   learning_rate = 0.05
@@ -56,7 +56,10 @@ def train_policy_value_network(model, dataloader):
   for epoch in range(epochs_count):
     epoch_loss = 0.0
 
-    for image_data, package_data, priors, reward in dataloader:
+    for inputs in dataloader:
+      inputs = (tensor.to(device) for tensor in list(inputs))
+      image_data, package_data, priors, reward = inputs
+
       predicted_priors, predicted_reward = model(image_data, package_data)
       loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
       optimizer.zero_grad()
