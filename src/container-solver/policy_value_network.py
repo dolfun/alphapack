@@ -61,6 +61,8 @@ def train_policy_value_network(model, trainloader, testloader, device):
 
     avg_loss = epoch_loss / len(trainloader)
     print(f'Epoch [{epoch+1}/{epochs_count}], Loss: {avg_loss:.4f}')
+    with open('train.csv', 'a') as f:
+      f.write(f'{avg_loss},')
 
   if testloader == None:
     return
@@ -77,3 +79,5 @@ def train_policy_value_network(model, trainloader, testloader, device):
       total_loss += loss.item()
     avg_loss = total_loss / len(testloader)
     print(f'Loss on test: {avg_loss:.4f}')
+    with open('train.csv', 'a') as f:
+      f.write(f'{avg_loss}\n')
