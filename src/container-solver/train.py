@@ -61,7 +61,7 @@ class ExperienceReplay(Dataset):
 
   def __len__(self):
     return len(self.evaluations)
-  
+
   def __getitem__(self, idx):
     return self.evaluations[idx]
 
@@ -115,8 +115,8 @@ def generate_training_data(
 
   baseline_rewards = np.array(baseline_rewards)
   mcts_rewards = np.array(mcts_rewards)
-  print(f'Average baseline reward: {baseline_rewards.mean():.2} ± {baseline_rewards.std() * 100:.2}%')
-  print(f'Average MCTS reward: {mcts_rewards.mean():.2} ± {mcts_rewards.std() * 100:.2}%')
+  print(f'Average baseline reward: {baseline_rewards.mean():.2} ± {baseline_rewards.std():.3f}')
+  print(f'Average MCTS reward: {mcts_rewards.mean():.2} ± {mcts_rewards.std():.3f}')
   print(f'Relative Rewards -> (-{relative_rewards[0]}, +{relative_rewards[1]})')
 
 def perform_iteration(model_path, addresses, episodes_file_path, generate_only=False):
@@ -144,12 +144,12 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
     pass
 
   with open(episodes_file_path, 'ab') as file:
-    games_per_iteration = 8
-    simulations_per_move = 64
+    games_per_iteration = 12
+    simulations_per_move = 256
     c_puct = 5.0
     virtual_loss = 3
-    thread_count = 16
-    batch_size = 4
+    thread_count = 32
+    batch_size = 8
     generate_training_data(
       games_per_iteration, simulations_per_move, 
       c_puct, virtual_loss, thread_count, batch_size, 

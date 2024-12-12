@@ -52,3 +52,19 @@ if (EXISTS ${STUBGEN_EXECUTABLE})
     COMMAND ${STUBGEN_EXECUTABLE} -m container_solver -o .
     WORKING_DIRECTORY ${MODULE_OUTPUT_DIR})
 endif()
+
+add_executable(
+  test
+  test.cc
+  mcts.h
+  array2d.h
+  package.h
+  container.h
+  container.cc
+  episode_generator.h
+  episode_generator.cc
+)
+target_compile_features(test PUBLIC cxx_std_20)
+target_link_libraries(test PUBLIC glm::glm-header-only cpr::cpr)
+# target_compile_options(test PRIVATE -fsanitize=address)
+# target_link_options(test PRIVATE -fsanitize=address)

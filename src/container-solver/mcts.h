@@ -4,9 +4,7 @@
 #include <thread>
 #include <vector>
 #include <future>
-#include <ranges>
 #include <utility>
-#include <semaphore>
 
 namespace mcts {
 
@@ -21,11 +19,7 @@ concept StateConcept = requires(State& state, int action_idx) {
 using InferenceResult_t = std::pair<std::vector<float>, float>;
 template <typename InferenceQueue, typename State>
 concept InferenceQueueConcept = requires(const State& state, InferenceQueue& inference_queue) {
-  { std::as_const(inference_queue).batch_size() } -> std::same_as<size_t>;
   { inference_queue.enqueue(state) } -> std::same_as<std::future<InferenceResult_t>>;
-  { inference_queue.flush() } -> std::same_as<void>;
-  { inference_queue.size() } -> std::same_as<size_t>;
-  { std::as_const(inference_queue).batch_size() } -> std::same_as<size_t>;
 };
 
 template <StateConcept State>
@@ -36,7 +30,6 @@ struct Node {
   std::weak_ptr<Node> prev_node;
   
   std::atomic<bool> visited = false, evaluated = false;
-  std::atomic<int> unvisited_leaf_count = 1;
   std::atomic<int> action_idx = -1;
   std::atomic<int> visit_count = 0;
   std::atomic<float> total_action_value = 0.0f;
@@ -56,8 +49,7 @@ bool run_mcts_simulation(
   std::atomic<int>& simulation_count, int max_simulations) {
   // Selection
   std::vector<NodePtr<State>> search_path { node };
-  while (node->visited) {
-    if (!node->evaluated) return false;
+  while (node->evaluated) {
     if (node->children.empty()) return true;
 
     int total_visit_count = node->visit_count - 1;
@@ -100,9 +92,6 @@ bool run_mcts_simulation(
 
   // Enqueue for async evaluation
   auto evaluator_result = inference_queue.enqueue(*node->state);
-  if (search_path[0]->unvisited_leaf_count <= inference_queue.batch_size()) {
-    inference_queue.flush();
-  }
 
   // Expansion
   auto actions = node->state->possible_actions();
@@ -125,13 +114,11 @@ bool run_mcts_simulation(
   }
 
   // Backpropagation
-  int action_count = actions.size();
-  for (auto node : std::ranges::views::reverse(search_path)) {
+  for (auto node : search_path) {
     node->visit_count += 1 - virtual_loss;
     node->total_action_value += value + virtual_loss;
-    node->unvisited_leaf_count += action_count - 1;
-    node->evaluated = true;
   }
+  node->evaluated = true;
 
   return true;
 }
@@ -153,40 +140,25 @@ auto generate_episode(
   float c_puct, int virtual_loss, int thread_count, 
   InferenceQueue& inference_queue)
     -> std::vector<Evaluation<State>> {
-
-  std::atomic<bool> to_end = false;
-  std::jthread inference_queue_daemon {[&] {
-    while (!to_end) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      if (inference_queue.size() < inference_queue.batch_size()) {
-        inference_queue.flush();
-      }
-    }
-  }};
-
   std::vector<Evaluation<State>> state_evaluations;
   auto node = std::make_shared<Node<State>>();
   node->state = std::make_unique<State>(state);
   while (true) {
-    std::vector<std::thread> threads;
-    std::counting_semaphore counting_semaphore { thread_count };
     std::atomic<int> simulation_count;
-    while (simulation_count < simulations_per_move) {
-      counting_semaphore.acquire();
-
-      std::binary_semaphore launched_semaphore { 0 };
-      auto thread = std::thread([&] {
-        launched_semaphore.release();
+    auto task = [&] {
+      while (simulation_count < simulations_per_move) {
         bool success = run_mcts_simulation<State>(
           node, c_puct, virtual_loss, 
           inference_queue, simulation_count, simulations_per_move
         );
         if (success) ++simulation_count;
-        counting_semaphore.release();
-      });
+      }
+    };
 
-      launched_semaphore.acquire();
-      threads.emplace_back(std::move(thread));
+    std::vector<std::thread> threads;
+    threads.reserve(thread_count);
+    for (int i = 0; i < thread_count; ++i) {
+      threads.emplace_back(task);
     }
 
     for (auto& thread : threads) {
@@ -220,7 +192,6 @@ auto generate_episode(
     evaluation.reward = reward;
   }
 
-  to_end = true;
   return state_evaluations;
 }
 
