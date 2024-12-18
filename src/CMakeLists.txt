@@ -24,9 +24,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
+add_subdirectory(mcts)
+
 pybind11_add_module(
   container_solver
-  mcts.h
   array2d.h
   package.h
   container.h
@@ -37,7 +38,7 @@ pybind11_add_module(
 )
 
 target_compile_features(container_solver PUBLIC cxx_std_20)
-target_link_libraries(container_solver PUBLIC glm::glm-header-only cpr::cpr)
+target_link_libraries(container_solver PUBLIC mcts glm::glm-header-only cpr::cpr)
 
 set(MODULE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/src)
 set_target_properties(
@@ -60,7 +61,6 @@ endif()
 add_executable(
   test
   test.cc
-  mcts.h
   array2d.h
   package.h
   container.h
@@ -69,6 +69,6 @@ add_executable(
   episode_generator.cc
 )
 target_compile_features(test PUBLIC cxx_std_20)
-target_link_libraries(test PUBLIC glm::glm-header-only cpr::cpr)
+target_link_libraries(test PUBLIC glm::glm-header-only mcts cpr::cpr)
 # target_compile_options(test PRIVATE -fsanitize=address)
 # target_link_options(test PRIVATE -fsanitize=address)

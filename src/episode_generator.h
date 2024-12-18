@@ -1,5 +1,5 @@
 #pragma once
-#include "mcts.h"
+#include "mcts/generate_episode.h"
 #include "container.h"
 
 auto generate_episode(
