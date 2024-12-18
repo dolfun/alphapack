@@ -17,7 +17,7 @@ int main() {
     int container_height = 24;
     Container container { container_height, packages };
     std::vector<std::string> addresses = { "127.0.0.1:8000" };
-    auto episode = generate_episode(container, 256, 5.0, 3, 24, 4, addresses);
+    auto episode = generate_episode(container, 256, 5.0, 3, 16, 12, addresses);
 
     std::cout << "[" << (i + 1) << "/" << iteration_count << "]:" << episode.back().reward << std::endl;
   }

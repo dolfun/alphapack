@@ -37,18 +37,18 @@ async def root(request: Request):
   if batch_size > 1: print(f'Inference for batch size {batch_size} received!')
 
   image_data = []
-  packages_data = []
+  additional_data = []
   step_size = len(data) // batch_size
   containers = [Container.unserialize(data[i:i+step_size]) for i in range(0, len(data), step_size)]
   for container in containers:
     height_map = np.array(container.height_map, dtype=np.float32) / container.height
     image_data.append(np.expand_dims(height_map, axis=0))
-    packages_data.append(normalize_packages(container))
+    additional_data.append(normalize_packages(container))
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
-  packages_data = torch.tensor(np.stack(packages_data, axis=0), device=device)
+  additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
   with torch.no_grad():
-    policy, value = policy_value_network.forward(image_data, packages_data)
+    policy, value = policy_value_network.forward(image_data, additional_data)
     policy = torch.softmax(policy, dim=1)
     result = torch.cat((policy, value), dim=1)
 
