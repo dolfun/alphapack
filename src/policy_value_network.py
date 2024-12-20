@@ -21,61 +21,30 @@ class ResidualBlock(nn.Module):
     out += residual
     out = self.relu(out)
     return out
-  
-class PolicyHead(nn.Module):
-  def __init__(self, nr_channels, base_size):
-    super(PolicyHead, self).__init__()
-    self.conv = nn.Conv2d(nr_channels, 2, kernel_size=1, stride=1)
-    self.bn = nn.BatchNorm2d(2)
-    self.relu = nn.ReLU()
-    self.fc = nn.Linear(2 * base_size * base_size, base_size * base_size)
-
-  def forward(self, x):
-    out = self.conv(x)
-    out = self.bn(out)
-    out = self.relu(out)
-    out = torch.flatten(out, start_dim=1)
-    out = self.fc(out)
-    return out
-
-class ValueHead(nn.Module):
-  def __init__(self, nr_channels, base_size):
-    super(ValueHead, self).__init__()
-    self.conv = nn.Conv2d(nr_channels, 1, kernel_size=1, stride=1)
-    self.bn = nn.BatchNorm2d(1)
-    self.relu = nn.ReLU()
-    self.fc1 = nn.Linear(base_size * base_size, 256)
-    self.fc2 = nn.Linear(256, 1)
-    self.sigmoid = nn.Sigmoid()
-
-  def forward(self, x):
-    out = self.conv(x)
-    out = self.bn(out)
-    out = self.relu(out)
-    out = torch.flatten(out, start_dim=1)
-    out = self.fc1(out)
-    out = self.relu(out)
-    out = self.fc2(out)
-    out = self.sigmoid(out)
-    return out
 
 class PolicyValueNetwork(nn.Module):
   def __init__(self, base_size=16, in_channels=1, additional_input_size=128, nr_residual_blocks=10):
     super(PolicyValueNetwork, self).__init__()
-    self.base_size = base_size
-    self.nr_channels = 256
+    nr_channels = 256
 
     self.conv_init = nn.Sequential(
-      nn.Conv2d(in_channels, self.nr_channels, kernel_size=3, stride=1, padding=1),
-      nn.BatchNorm2d(self.nr_channels),
+      nn.Conv2d(in_channels, nr_channels, kernel_size=3, stride=1, padding=1),
+      nn.BatchNorm2d(nr_channels),
       nn.ReLU()
     )
 
     self.residual_blocks = nn.ModuleList([
-      ResidualBlock(self.nr_channels) for _ in range(nr_residual_blocks)
+      ResidualBlock(nr_channels) for _ in range(nr_residual_blocks)
     ])
 
-    fc_additional_output_size = 256
+    conv_final_nr_channels = 2
+    self.conv_final = nn.Sequential(
+      nn.Conv2d(nr_channels, conv_final_nr_channels, kernel_size=3, stride=1, padding=1),
+      nn.BatchNorm2d(conv_final_nr_channels),
+      nn.ReLU()
+    )
+
+    fc_additional_output_size = 64
     self.fc_additional = nn.Sequential(
       nn.Linear(additional_input_size, 128),
       nn.ReLU(),
@@ -83,14 +52,24 @@ class PolicyValueNetwork(nn.Module):
       nn.ReLU()
     )
 
-    fc_fusion_input_size = self.nr_channels * self.base_size * self.base_size + fc_additional_output_size
+    base_area = base_size * base_size
+    fc_fusion_input_size = conv_final_nr_channels * base_area + fc_additional_output_size
+    fc_fusion_output_size = 256
     self.fc_fusion = nn.Sequential(
-      nn.Linear(fc_fusion_input_size, self.nr_channels),
+      nn.Linear(fc_fusion_input_size, 384),
+      nn.ReLU(),
+      nn.Linear(384, fc_fusion_output_size),
       nn.ReLU()
     )
 
-    self.policy_head = PolicyHead(self.nr_channels, base_size)
-    self.value_head = ValueHead(self.nr_channels, base_size)
+    self.policy_head = nn.Linear(fc_fusion_output_size, base_area)
+
+    self.value_head = nn.Sequential(
+      nn.Linear(fc_fusion_output_size, 256),
+      nn.ReLU(),
+      nn.Linear(256, 1),
+      nn.Sigmoid()
+    )
 
   def forward(self, in_image, in_additional):
     out_image = self.conv_init(in_image)
@@ -98,12 +77,12 @@ class PolicyValueNetwork(nn.Module):
     for block in self.residual_blocks:
       out_image = block(out_image)
 
+    out_image = self.conv_final(out_image)
+    
     out_image = torch.flatten(out_image, start_dim=1)
     out_additional = self.fc_additional(in_additional)
-
     fused = torch.cat((out_image, out_additional), dim=1)
     fused = self.fc_fusion(fused)
-    fused = fused.view(-1, self.nr_channels, 1, 1).repeat(1, 1, self.base_size, self.base_size)
 
     policy = self.policy_head(fused)
     value = self.value_head(fused)

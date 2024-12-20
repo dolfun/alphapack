@@ -32,8 +32,6 @@ pybind11_add_module(
   package.h
   container.h
   container.cc
-  episode_generator.h
-  episode_generator.cc
   container_solver.cc
 )
 
@@ -65,8 +63,6 @@ add_executable(
   package.h
   container.h
   container.cc
-  episode_generator.h
-  episode_generator.cc
 )
 target_compile_features(test PUBLIC cxx_std_20)
 target_link_libraries(test PUBLIC glm::glm-header-only mcts cpr::cpr)

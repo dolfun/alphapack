@@ -1,6 +1,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include "episode_generator.h"
+#include "container.h"
+#include "inference_queue.h"
+#include "mcts/generate_episode.h"
 namespace py = pybind11;
 
 template <typename T>
@@ -14,8 +16,6 @@ py::buffer_info array_2d_buffer_info(Array2D<T>& arr) {
   info.strides = { static_cast<long>(sizeof(T) * arr.cols()), sizeof(T) };
   return info;
 }
-
-PYBIND11_MAKE_OPAQUE(Container)
 
 PYBIND11_MODULE(container_solver, m) {
   // glm::vec3
@@ -72,24 +72,19 @@ PYBIND11_MODULE(container_solver, m) {
     .def_readwrite("priors", &Evaluation::priors)
     .def_readwrite("reward", &Evaluation::reward);
 
+  // Inference Queue
+  py::class_<InferenceQueue<Container>>(m, "InferenceQueue")
+    .def(py::init<size_t, std::vector<std::string>>(), py::arg("batch_size"), py::arg("addresses"));
+
   // generate episode
-  using ContainerEvaluatorFn = const std::function<std::pair<std::vector<float>, float>(const Container&)>&;
   m.def(
     "generate_episode",
-    &generate_episode,
+    &mcts::generate_episode<Container, InferenceQueue<Container>>,
     py::arg("container"),
     py::arg("simulations_per_move"),
     py::arg("c_puct"),
     py::arg("virtual_loss"),
     py::arg("thread_count"),
-    py::arg("batch_size"),
-    py::arg("addresses")
-  );
-
-  m.def(
-    "calculate_baseline_reward",
-    &calculate_baseline_reward,
-    py::arg("container"),
-    py::arg("addresses")
+    py::arg("inference_queue")
   );
 }

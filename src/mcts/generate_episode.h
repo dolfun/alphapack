@@ -1,20 +1,9 @@
 #pragma once
+#include "mcts_common.h"
 #include "mcts.h"
-#include "mcts_async.h"
 #include <thread>
 
 namespace mcts {
-
-template <typename State>
-struct Evaluation {
-  Evaluation (const State& _state, int _action_idx = -1, const std::vector<float>& _priors = {}, float _reward = {})
-    : state { _state }, action_idx { _action_idx }, priors { _priors }, reward { _reward } {}
-
-  State state;
-  int action_idx;
-  std::vector<float> priors;
-  float reward;
-};
 
 template <StateConcept State, InferenceQueueConcept<State> InferenceQueue>
 auto generate_episode(
@@ -23,8 +12,6 @@ auto generate_episode(
   InferenceQueue& inference_queue)
     -> std::vector<Evaluation<State>> {
 
-  using namespace mcts::async;
-
   std::vector<Evaluation<State>> state_evaluations;
   auto node = std::make_shared<Node<State>>();
   node->state = std::make_unique<State>(state);
@@ -32,10 +19,7 @@ auto generate_episode(
     std::atomic<int> simulation_count;
     auto task = [&] {
       while (simulation_count < simulations_per_move) {
-        bool success = run_mcts_simulation<State>(
-          node, c_puct, virtual_loss, 
-          inference_queue, simulation_count, simulations_per_move
-        );
+        bool success = run_mcts_simulation<State>(node, c_puct, virtual_loss, inference_queue);
         if (success) ++simulation_count;
       }
     };

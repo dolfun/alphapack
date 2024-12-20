@@ -1,4 +1,4 @@
-from container_solver import Container, generate_episode, calculate_baseline_reward
+from container_solver import Container, InferenceQueue, generate_episode
 from policy_value_network import PolicyValueNetwork, train_policy_value_network
 from package_utils import random_package, normalize_packages
 
@@ -79,47 +79,34 @@ def save_state_evaluation(evaluation, episodes_file):
 
 def generate_training_data(
     games_per_iteration, simulations_per_move, 
-    c_puct, virtual_loss, thread_count, batch_size, 
-    addresses, episodes_file):
-  baseline_rewards = []
-  mcts_rewards = []
-  relative_rewards = [0, 0]
-
+    c_puct, virtual_loss, thread_count,
+    inference_queue, episodes_file):
+  
+  rewards = []
   data_points_count = 0
   for _ in tqdm(range(games_per_iteration)):
     container_height = 24
     packages = [random_package() for _ in range(Container.package_count)]
     container = Container(container_height, packages)
 
-    baseline_reward = calculate_baseline_reward(container, addresses)
-    baseline_rewards.append(baseline_reward)
-
     episode = generate_episode(
       container, simulations_per_move, 
-      c_puct, virtual_loss, thread_count, 
-      batch_size, addresses
+      c_puct, virtual_loss,
+      thread_count, inference_queue
     )
+
     data_points_count += len(episode)
-
-    mcts_reward = episode[-1].reward
-    mcts_rewards.append(mcts_reward)
-
-    relative_reward = (+1 if mcts_reward > baseline_reward else -1)
-    relative_rewards[0 if relative_reward == -1 else 1] += 1
+    rewards.append(episode[-1].reward)
 
     for state_evaluation in episode:
-      state_evaluation.reward = relative_reward
       save_state_evaluation(state_evaluation, episodes_file)
 
   print(f'{data_points_count} data points generated')
 
-  baseline_rewards = np.array(baseline_rewards)
-  mcts_rewards = np.array(mcts_rewards)
-  print(f'Average baseline reward: {baseline_rewards.mean():.2} ± {baseline_rewards.std():.3f}')
-  print(f'Average MCTS reward: {mcts_rewards.mean():.2} ± {mcts_rewards.std():.3f}')
-  print(f'Relative Rewards -> (-{relative_rewards[0]}, +{relative_rewards[1]})')
+  rewards = np.array(rewards)
+  print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.3f}')
   with open('gen.csv', 'a') as f:
-    f.write(f'{baseline_rewards.mean()},{mcts_rewards.mean()}\n')
+    f.write(f'{rewards.mean()}\n')
 
 def perform_iteration(model_path, addresses, episodes_file_path, generate_only=False):
   # Create model if it does not exist
@@ -145,17 +132,20 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
   with open(episodes_file_path, 'w'):
     pass
 
-  with open(episodes_file_path, 'ab') as file:
-    games_per_iteration = 10
-    simulations_per_move = 128
+  with open(episodes_file_path, 'ab') as episodes_file:
+    games_per_iteration = 16
+    simulations_per_move = 256
     c_puct = 5.0
     virtual_loss = 3
-    thread_count = 32
-    batch_size = 8
+    thread_count = 16
+    batch_size = 4
+
+    inference_queue = InferenceQueue(batch_size, addresses)
+
     generate_training_data(
       games_per_iteration, simulations_per_move, 
-      c_puct, virtual_loss, thread_count, batch_size, 
-      addresses, file
+      c_puct, virtual_loss, thread_count,
+      inference_queue, episodes_file
     )
 
   print()
@@ -169,8 +159,8 @@ def perform_iteration(model_path, addresses, episodes_file_path, generate_only=F
   train_dataset = ExperienceReplay(train_data)
   test_dataset = ExperienceReplay(test_data)
 
-  trainloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-  testloader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+  trainloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+  testloader = DataLoader(test_dataset, batch_size=16, shuffle=True)
 
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
