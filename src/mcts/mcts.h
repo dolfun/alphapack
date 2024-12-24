@@ -8,14 +8,14 @@ namespace mcts {
 
 template <StateConcept State>
 struct Node {
-  std::unique_ptr<State> state = nullptr;
+  std::shared_ptr<State> state;
   std::weak_ptr<Node> prev_node;
   
-  std::atomic<bool> visited = false, evaluated = false;
+  std::atomic<bool> visited, evaluated;
   std::atomic<int> action_idx = -1;
-  std::atomic<int> visit_count = 0;
-  std::atomic<float> total_action_value = 0.0f;
-  std::atomic<float> prior = 0.0f;
+  std::atomic<int> visit_count;
+  std::atomic<float> total_action_value;
+  std::atomic<float> prior;
 
   using Ptr = std::shared_ptr<Node<State>>;
   std::vector<Ptr> children;
@@ -24,8 +24,8 @@ struct Node {
 template <typename State>
 using NodePtr = Node<State>::Ptr;
 
-template <StateConcept State, InferenceQueueConcept<State> InferenceQueue>
-bool run_mcts_simulation(NodePtr<State> node, float c_puct, int virtual_loss, InferenceQueue& inference_queue) {
+template <StateConcept State, EvaluationQueueConcept<State> EvaluationQueue>
+bool run_mcts_simulation(NodePtr<State> node, float c_puct, int virtual_loss, EvaluationQueue& evaluation_queue) {
   // Selection
   std::vector<NodePtr<State>> search_path { node };
   while (node->evaluated) {
@@ -65,12 +65,12 @@ bool run_mcts_simulation(NodePtr<State> node, float c_puct, int virtual_loss, In
   // Lazy State Update
   if (node->state == nullptr) {
     auto prev_node = node->prev_node.lock();
-    node->state = std::make_unique<State>(*prev_node->state);
+    node->state = std::make_shared<State>(*prev_node->state);
     node->state->transition(node->action_idx);
   }
 
   // Enqueue for async evaluation
-  auto evaluator_result = inference_queue.enqueue(*node->state);
+  auto evaluator_result = evaluation_queue.enqueue(node->state);
 
   // Expansion
   auto actions = node->state->possible_actions();

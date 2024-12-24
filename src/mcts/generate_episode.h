@@ -2,14 +2,15 @@
 #include "mcts_common.h"
 #include "mcts.h"
 #include <thread>
+#include <atomic>
+#include <latch>
 
 namespace mcts {
 
-template <StateConcept State, InferenceQueueConcept<State> InferenceQueue>
+template <StateConcept State, EvaluationQueueConcept<State> EvaluationQueue>
 auto generate_episode(
-  State state, int simulations_per_move, 
-  float c_puct, int virtual_loss, int thread_count, 
-  InferenceQueue& inference_queue)
+  const State& state, int simulations_per_move, int thread_count, 
+  float c_puct, int virtual_loss, EvaluationQueue& evaluation_queue)
     -> std::vector<Evaluation<State>> {
 
   std::vector<Evaluation<State>> state_evaluations;
@@ -17,17 +18,26 @@ auto generate_episode(
   node->state = std::make_unique<State>(state);
   while (true) {
     std::atomic<int> simulation_count;
+    std::latch latch { thread_count + 1 };
+    std::atomic<int> finished_count;
     auto task = [&] {
+      latch.arrive_and_wait();
       while (simulation_count < simulations_per_move) {
-        bool success = run_mcts_simulation<State>(node, c_puct, virtual_loss, inference_queue);
+        bool success = run_mcts_simulation<State>(node, c_puct, virtual_loss, evaluation_queue);
         if (success) ++simulation_count;
       }
+      ++finished_count;
     };
 
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
     for (int i = 0; i < thread_count; ++i) {
       threads.emplace_back(task);
+    }
+
+    latch.count_down();
+    while (finished_count < thread_count) {
+      evaluation_queue.run();
     }
 
     for (auto& thread : threads) {

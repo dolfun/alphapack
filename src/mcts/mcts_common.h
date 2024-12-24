@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <future>
 #include <vector>
 #include <utility>
@@ -13,10 +14,9 @@ concept StateConcept = requires(State& state, int action_idx) {
   { std::as_const(state).reward() } -> std::same_as<float>;
 };
 
-using InferenceResult_t = std::pair<std::vector<float>, float>;
-template <typename InferenceQueue, typename State>
-concept InferenceQueueConcept = requires(const State& state, InferenceQueue& inference_queue) {
-  { inference_queue.enqueue(state) } -> std::same_as<std::future<InferenceResult_t>>;
+template <typename EvaluationQueue, typename State>
+concept EvaluationQueueConcept = requires(std::shared_ptr<State> state, EvaluationQueue& evaluation_queue) {
+  { evaluation_queue.enqueue(state) } -> std::same_as<std::future<std::pair<std::vector<float>, float>>>;
 };
 
 template <typename State>

@@ -11,13 +11,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glm)
 
 FetchContent_Declare(
-  cpr
-  GIT_REPOSITORY https://github.com/libcpr/cpr.git
-  GIT_TAG dec9422db3af470641f8b0d90e4b451c4daebf64
-)
-FetchContent_MakeAvailable(cpr)
-
-FetchContent_Declare(
   pybind11
   GIT_REPOSITORY https://github.com/pybind/pybind11.git
   GIT_TAG a2e59f0e7065404b44dfe92a28aca47ba1378dc4
@@ -32,11 +25,15 @@ pybind11_add_module(
   package.h
   container.h
   container.cc
+  evaluation_queue.h
+  evaluation_queue.cc
+  generate_episode.h
+  generate_episode.cc
   container_solver.cc
 )
 
 target_compile_features(container_solver PUBLIC cxx_std_20)
-target_link_libraries(container_solver PUBLIC mcts glm::glm-header-only cpr::cpr)
+target_link_libraries(container_solver PUBLIC mcts glm::glm-header-only)
 
 set(MODULE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/src)
 set_target_properties(
@@ -53,18 +50,6 @@ endif()
 if (EXISTS ${STUBGEN_EXECUTABLE})
   add_custom_command(TARGET container_solver POST_BUILD
     COMMAND ${STUBGEN_EXECUTABLE} -m container_solver -o .
-    WORKING_DIRECTORY ${MODULE_OUTPUT_DIR})
+    WORKING_DIRECTORY ${MODULE_OUTPUT_DIR}
+  )
 endif()
-
-add_executable(
-  test
-  test.cc
-  array2d.h
-  package.h
-  container.h
-  container.cc
-)
-target_compile_features(test PUBLIC cxx_std_20)
-target_link_libraries(test PUBLIC glm::glm-header-only mcts cpr::cpr)
-# target_compile_options(test PRIVATE -fsanitize=address)
-# target_link_options(test PRIVATE -fsanitize=address)

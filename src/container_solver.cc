@@ -1,8 +1,8 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
 #include <pybind11/stl.h>
 #include "container.h"
-#include "inference_queue.h"
-#include "mcts/generate_episode.h"
+#include "generate_episode.h"
 namespace py = pybind11;
 
 template <typename T>
@@ -40,12 +40,14 @@ PYBIND11_MODULE(container_solver, m) {
     .def_buffer(array_2d_buffer_info<int>);
   
   // Container
-  py::class_<Container>(m, "Container")
+  py::class_<Container, std::shared_ptr<Container>>(m, "Container")
     .def(py::init<int, std::vector<Package>>(), py::arg("height"), py::arg("packages"))
 
     .def_property_readonly("height", &Container::height)
     .def_property_readonly("packages", &Container::packages)
     .def_property_readonly("height_map", &Container::height_map)
+
+    .def_property_readonly("normalized_packages", &Container::normalized_packages)
 
     .def_property_readonly("possible_actions", &Container::possible_actions)
     .def("transition", &Container::transition, py::arg("action_idx"))
@@ -54,10 +56,10 @@ PYBIND11_MODULE(container_solver, m) {
     .def("serialize", &Container::serialize)
     .def("unserialize", &Container::unserialize)
 
+    .def_readonly_static("length", &Container::length)
     .def_readonly_static("action_count", &Container::action_count)
     .def_readonly_static("package_count", &Container::package_count)
-    .def_readonly_static("length", &Container::length)
-    .def_readonly_static("width", &Container::width)
+    .def_readonly_static("values_per_package", &Container::values_per_package)
 
     .def(py::pickle(
       [] (const Container& container) { return container.serialize(); }, 
@@ -72,19 +74,15 @@ PYBIND11_MODULE(container_solver, m) {
     .def_readwrite("priors", &Evaluation::priors)
     .def_readwrite("reward", &Evaluation::reward);
 
-  // Inference Queue
-  py::class_<InferenceQueue<Container>>(m, "InferenceQueue")
-    .def(py::init<size_t, std::vector<std::string>>(), py::arg("batch_size"), py::arg("addresses"));
-
   // generate episode
   m.def(
     "generate_episode",
-    &mcts::generate_episode<Container, InferenceQueue<Container>>,
-    py::arg("container"),
+    &generate_episode,
     py::arg("simulations_per_move"),
+    py::arg("thread_count"),
     py::arg("c_puct"),
     py::arg("virtual_loss"),
-    py::arg("thread_count"),
-    py::arg("inference_queue")
+    py::arg("batch_size"),
+    py::arg("evaluate")
   );
 }

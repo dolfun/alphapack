@@ -1,10 +1,9 @@
-from container_solver import Container, InferenceQueue, generate_episode
+from container_solver import Container, generate_episode
 from policy_value_network import PolicyValueNetwork, train_policy_value_network
-from package_utils import random_package, normalize_packages
 
 import os
+import tempfile
 import numpy as np
-
 import torch
 from torch.utils.data import Dataset, DataLoader
 
@@ -16,22 +15,21 @@ if device != 'cuda':
   except ImportError:
     pass
 
-import requests
 import pickle
 import argparse
 from tqdm import tqdm
 
-def get_test_train_data(episodes_file_path, *, ratio):
+def get_test_train_data(file, *, ratio):
   evaluations = []
-  with open(episodes_file_path, 'rb') as f:
-    while True:
-      try:
-        evaluations.append(pickle.load(f))
-      except EOFError:
-        break
-  
+  file.seek(0)
+  while True:
+    try:
+      evaluations.append(pickle.load(file))
+    except EOFError:
+      break
+
   train_count = int(len(evaluations) * ratio)
-  return evaluations[:train_count], evaluations[train_count:]
+  return ExperienceReplay(evaluations[:train_count]), ExperienceReplay(evaluations[train_count:])
 
 class ExperienceReplay(Dataset):
   def __init__(self, evaluations):
@@ -64,123 +62,95 @@ class ExperienceReplay(Dataset):
 
   def __getitem__(self, idx):
     return self.evaluations[idx]
-
-def save_state_evaluation(evaluation, episodes_file):
-  container = evaluation.container
-  priors = evaluation.priors
-  reward = evaluation.reward
-
-  height_map = np.array(container.height_map, dtype=np.float32) / container.height
-  height_map = np.expand_dims(height_map, axis=0)
-  packages_data = normalize_packages(container)
-  priors = np.array(priors, dtype=np.float32)
-  reward = np.array([reward], dtype=np.float32)
-  pickle.dump((height_map, packages_data, priors, reward), episodes_file)
-
-def generate_training_data(
-    games_per_iteration, simulations_per_move, 
-    c_puct, virtual_loss, thread_count,
-    inference_queue, episodes_file):
   
+def evaluate_with_model(model, containers: list[Container]):
+  image_data = []
+  additional_data = []
+  for container in containers:
+    height_map = np.array(container.height_map, dtype=np.float32) / container.height
+    image_data.append(np.expand_dims(height_map, axis=0))
+    additional_data.append(np.array(container.normalized_packages, dtype=np.float32))
+  
+  image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
+  additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
+  with torch.no_grad():
+    policy, value = model.forward(image_data, additional_data)
+    policy = torch.softmax(policy, dim=1)
+    result = (policy.cpu().numpy(), value.cpu().numpy())
+    return result
+
+def generate_training_data(config, model, episodes_file):
+  model.eval()
+  evaluate = lambda containers: evaluate_with_model(model, containers)
+
   rewards = []
   data_points_count = 0
-  for _ in tqdm(range(games_per_iteration)):
-    container_height = 24
-    packages = [random_package() for _ in range(Container.package_count)]
-    container = Container(container_height, packages)
-
+  for _ in tqdm(range(config['games_per_iteration'])):
     episode = generate_episode(
-      container, simulations_per_move, 
-      c_puct, virtual_loss,
-      thread_count, inference_queue
+      config['simulations_per_move'], config['thread_count'],
+      config['c_puct'], config['virtual_loss'],
+      config['batch_size'], evaluate
     )
 
     data_points_count += len(episode)
     rewards.append(episode[-1].reward)
-
-    for state_evaluation in episode:
-      save_state_evaluation(state_evaluation, episodes_file)
-
-  print(f'{data_points_count} data points generated')
+    
+    for evaluation in episode:
+      container = evaluation.container
+      height_map = np.array(container.height_map, dtype=np.float32) / container.height
+      image_data = np.expand_dims(height_map, axis=0)
+      additional_data = np.array(container.normalized_packages, dtype=np.float32)
+      priors = np.array(evaluation.priors, dtype=np.float32)
+      reward = np.array([evaluation.reward], dtype=np.float32)
+      pickle.dump((image_data, additional_data, priors, reward), episodes_file)
 
   rewards = np.array(rewards)
+  print(f'{data_points_count} data points generated')
   print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.3f}')
-  with open('gen.csv', 'a') as f:
-    f.write(f'{rewards.mean()}\n')
 
-def perform_iteration(model_path, addresses, episodes_file_path, generate_only=False):
-  # Create model if it does not exist
-  if not os.path.exists(model_path):
-    policy_value_network = PolicyValueNetwork()
-    torch.save(policy_value_network.state_dict(), model_path)
-
-  # Uploaad model to all workers
-  print('UPLOADING MODELS:')
-  with open(model_path, 'rb') as model:
-    for address in addresses:
-      model.seek(0)
-      files = { 'file': model }
-      response = requests.post('http://' + address + '/policy_value_upload', files=files)
-      if response.text == 'success':
-        print(f'Model uploaded successfully to {address}')
-      else:
-        raise Exception(f'Model upload failed on worker: {address}')
-  print()
+def perform_iteration(config, model):
+  # Episodes file
+  episodes_file = tempfile.TemporaryFile()
 
   # Generate Games
   print('GENERATING GAMES:')
-  with open(episodes_file_path, 'w'):
-    pass
-
-  with open(episodes_file_path, 'ab') as episodes_file:
-    games_per_iteration = 16
-    simulations_per_move = 256
-    c_puct = 5.0
-    virtual_loss = 3
-    thread_count = 16
-    batch_size = 4
-
-    inference_queue = InferenceQueue(batch_size, addresses)
-
-    generate_training_data(
-      games_per_iteration, simulations_per_move, 
-      c_puct, virtual_loss, thread_count,
-      inference_queue, episodes_file
-    )
-
+  generate_training_data(config, model, episodes_file)
   print()
-
-  if generate_only:
-    return
   
   # Train
   print('TRAINING:')
-  train_data, test_data = get_test_train_data(episodes_file_path, ratio=0.8)
-  train_dataset = ExperienceReplay(train_data)
-  test_dataset = ExperienceReplay(test_data)
-
+  train_dataset, test_dataset = get_test_train_data(episodes_file, ratio=0.85)
   trainloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
   testloader = DataLoader(test_dataset, batch_size=16, shuffle=True)
-
-  model = PolicyValueNetwork().to(device)
-  model.load_state_dict(torch.load(model_path, weights_only=False))
   train_policy_value_network(model, trainloader, testloader, device)
-  
-  torch.save(model.state_dict(), model_path)
   print()
 
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
   parser.add_argument('--model_path', default='policy_value_network.pth')
-  parser.add_argument('--worker_addresses', default='127.0.0.1:8000')
-  parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
-  addresses = args.worker_addresses.split(',')
+  config = {
+    'games_per_iteration' : 16,
+    'simulations_per_move' : 256,
+    'thread_count' : 8,
+    'c_puct' : 5.0,
+    'virtual_loss' : 3,
+    'batch_size' : 4
+  }
+
+  # Load model
+  model = PolicyValueNetwork().to(device)
+  if os.path.exists(args.model_path):
+    model.load_state_dict(torch.load(args.model_path, weights_only=False))
+
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(args.model_path, addresses, 'episodes.bin', args.generate_only)
+    perform_iteration(config, model)
+
+    # Save model
+    torch.save(model.state_dict(), args.model_path)
 
 if __name__ == '__main__':
   main()
