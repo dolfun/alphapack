@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch import optim
 
 class ResidualBlock(nn.Module):
   def __init__(self, nr_channels):
@@ -88,45 +87,3 @@ class PolicyValueNetwork(nn.Module):
     value = self.value_head(fused)
 
     return policy, value
-
-def train_policy_value_network(model, trainloader, testloader, device):
-  model.train()
-
-  learning_rate = 0.005
-  epochs_count = 2
-  momentum = 0.9
-
-  criterion_policy = nn.CrossEntropyLoss()
-  criterion_value = nn.MSELoss()
-  optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=1e-4)
-  for epoch in range(epochs_count):
-    epoch_loss = 0.0
-    for inputs in trainloader:
-      inputs = (tensor.to(device) for tensor in list(inputs))
-      image_data, additional_data, priors, reward = inputs
-
-      predicted_priors, predicted_reward = model(image_data, additional_data)
-      loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
-      optimizer.zero_grad()
-      loss.backward()
-      optimizer.step()
-      epoch_loss += loss.item()
-
-    avg_loss = epoch_loss / len(trainloader)
-    print(f'Epoch [{epoch+1}/{epochs_count}], Loss: {avg_loss:.4f}')
-
-  if testloader == None:
-    return
-  
-  model.eval()
-  with torch.no_grad():
-    total_loss = 0.0
-    for inputs in testloader:
-      inputs = (tensor.to(device) for tensor in list(inputs))
-      image_data, additional_data, priors, reward = inputs
-
-      predicted_priors, predicted_reward = model(image_data, additional_data)
-      loss = criterion_policy(predicted_priors, priors) + criterion_value(predicted_reward, reward)
-      total_loss += loss.item()
-    avg_loss = total_loss / len(testloader)
-    print(f'Loss on test: {avg_loss:.4f}')
