@@ -50,11 +50,11 @@ def main():
   args = parser.parse_args()
 
   config = {
-    'games_per_iteration' : 32,
-    'simulations_per_move' : 128,
-    'thread_count' : 4,
-    'c_puct' : 5.0,
-    'virtual_loss' : 3,
+    'games_per_iteration' : 1024,
+    'simulations_per_move' : 256,
+    'thread_count' : 8,
+    'c_puct' : 4.5,
+    'virtual_loss' : 5,
     'batch_size' : 4
   }
 

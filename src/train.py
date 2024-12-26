@@ -56,8 +56,8 @@ def train_policy_value_network(model, train_data, validate_data, device):
   validate_loader = DataLoader(validate_dataset, batch_size=16)
 
   model.train()
-  learning_rate = 0.0025
-  epochs_count = 12
+  learning_rate = 0.005
+  epochs_count = 2
   momentum = 0.9
 
   optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=1e-4)
@@ -76,4 +76,4 @@ def train_policy_value_network(model, train_data, validate_data, device):
 
     avg_loss = epoch_loss / len(train_loader)
     val_loss = validate_model(model, validate_loader, device)
-    print(f'Epoch [{epoch+1}/{epochs_count}], Train Loss: {avg_loss:.4f}, Validation Loss: {val_loss:.4f}')
+    print(f'Epoch [{epoch+1}/{epochs_count}], Train: {avg_loss:.4f}, Val: {val_loss:.4f}')

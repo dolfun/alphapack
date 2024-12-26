@@ -13,6 +13,7 @@ def save_evaluation(evaluation, file):
   reward = np.array([evaluation.reward], dtype=np.float32)
   pickle.dump((image_data, additional_data, priors, reward), file)
 
+@torch.no_grad()
 def evaluate_with_model(model, device, containers):
   image_data = []
   additional_data = []
@@ -23,11 +24,10 @@ def evaluate_with_model(model, device, containers):
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
-  with torch.no_grad():
-    policy, value = model.forward(image_data, additional_data)
-    policy = torch.softmax(policy, dim=1)
-    result = (policy.cpu().numpy(), value.cpu().numpy())
-    return result
+  policy, value = model.forward(image_data, additional_data)
+  policy = torch.softmax(policy, dim=1)
+  result = (policy.cpu().numpy(), value.cpu().numpy())
+  return result
 
 def generate_training_data(config, model, device, episodes_file):
   model.eval()

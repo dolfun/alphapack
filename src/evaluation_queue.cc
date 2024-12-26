@@ -16,7 +16,7 @@ auto EvaluationQueue::enqueue(std::shared_ptr<Container> container) noexcept -> 
 
 void EvaluationQueue::run() noexcept {
   std::unique_lock lock { mutex };
-  cv.wait_for(lock, std::chrono::milliseconds(25), [&] {
+  cv.wait_for(lock, std::chrono::milliseconds(2), [&] {
     return queue.size() >= max_batch_size;
   });
   size_t batch_count = (queue.size() + max_batch_size - 1) / max_batch_size;

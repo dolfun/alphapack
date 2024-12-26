@@ -9,9 +9,10 @@ auto generate_episode(
     -> std::vector<mcts::Evaluation<Container>> {
 
   static std::random_device rd{};
-  static std::mt19937 engine { rd() };
   static std::uniform_int_distribution<int> dist { 4, 8 };
 
+  unsigned int seed = rd();
+  std::mt19937 engine { seed };
   std::vector<Package> packages(Container::package_count);
   for (auto& package : packages) {
     package.shape = { dist(engine), dist(engine), dist(engine) };
