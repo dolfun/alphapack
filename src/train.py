@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 
 class ExperienceReplay(Dataset):
   def __init__(self, evaluations):
@@ -49,21 +50,21 @@ def validate_model(model, dataloader, device):
     avg_loss = total_loss / len(dataloader)
     return avg_loss
 
-def train_policy_value_network(model, train_data, validate_data, device):
+def train_policy_value_network(model, train_data, val_data, device):
   train_dataset = ExperienceReplay(train_data)
-  validate_dataset = ExperienceReplay(validate_data)
+  val_dataset = ExperienceReplay(val_data)
   train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-  validate_loader = DataLoader(validate_dataset, batch_size=16)
+  val_loader = DataLoader(val_dataset, batch_size=16)
 
   model.train()
-  learning_rate = 0.005
+  learning_rate = 0.0025
   epochs_count = 2
   momentum = 0.9
 
   optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=1e-4)
   for epoch in range(epochs_count):
     epoch_loss = 0.0
-    for inputs in train_loader:
+    for inputs in tqdm(train_loader, leave=False):
       inputs = (tensor.to(device) for tensor in list(inputs))
       image_data, additional_data, priors, reward = inputs
 
@@ -74,6 +75,6 @@ def train_policy_value_network(model, train_data, validate_data, device):
       optimizer.step()
       epoch_loss += loss.item()
 
-    avg_loss = epoch_loss / len(train_loader)
-    val_loss = validate_model(model, validate_loader, device)
-    print(f'Epoch [{epoch+1}/{epochs_count}], Train: {avg_loss:.4f}, Val: {val_loss:.4f}')
+    train_loss = epoch_loss / len(train_loader)
+    val_loss = validate_model(model, val_loader, device)
+    print(f'Epoch [{epoch+1}/{epochs_count}], Train: {train_loss:.4f}, Val: {val_loss:.4f}')

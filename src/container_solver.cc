@@ -72,7 +72,21 @@ PYBIND11_MODULE(container_solver, m) {
     .def_readwrite("container", &Evaluation::state)
     .def_readwrite("action_idx", &Evaluation::action_idx)
     .def_readwrite("priors", &Evaluation::priors)
-    .def_readwrite("reward", &Evaluation::reward);
+    .def_readwrite("reward", &Evaluation::reward)
+    .def(py::pickle(
+      [] (const Evaluation& evaluation) {
+        return py::make_tuple(evaluation.state, evaluation.action_idx, evaluation.priors, evaluation.reward);
+      },
+      [] (py::tuple t) {
+        Evaluation evaluation {
+          t[0].cast<Container>(),
+          t[1].cast<int>(),
+          t[2].cast<std::vector<float>>(),
+          t[3].cast<float>()
+        };
+        return evaluation;
+      }
+    ));
 
   // generate episode
   m.def(
