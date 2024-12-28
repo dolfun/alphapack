@@ -22,9 +22,9 @@ class ResidualBlock(nn.Module):
     return out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, base_size=16, in_channels=1, additional_input_size=128, nr_residual_blocks=10):
+  def __init__(self, base_size=16, in_channels=1, additional_input_size=128, nr_residual_blocks=5):
     super(PolicyValueNetwork, self).__init__()
-    nr_channels = 256
+    nr_channels = 64
 
     self.conv_init = nn.Sequential(
       nn.Conv2d(in_channels, nr_channels, kernel_size=3, stride=1, padding=1),
@@ -67,7 +67,7 @@ class PolicyValueNetwork(nn.Module):
       nn.Linear(fc_fusion_output_size, 256),
       nn.ReLU(),
       nn.Linear(256, 1),
-      nn.Sigmoid()
+      nn.Tanh()
     )
 
   def forward(self, in_image, in_additional):

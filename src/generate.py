@@ -70,6 +70,7 @@ def generate_training_data_wrapper(_):
 def generate_training_data(config, model_path, device):
   file = tempfile.TemporaryFile()
   rewards = []
+  reshaped_rewards = { +1:0, -1:0 }
   data_points_count = 0
 
   with Pool(config['processes'], initializer=init_worker, initargs = (config, model_path, device)) as p:
@@ -78,12 +79,27 @@ def generate_training_data(config, model_path, device):
 
     it = p.imap_unordered(generate_training_data_wrapper, args)
     for episode in tqdm(it, total=episode_count):
-      dump_episode(episode, file)
       data_points_count += len(episode)
-      rewards.append(episode[-1].reward)
+
+      reward = episode[-1].reward
+      rewards.append(reward)
+
+      threshold = 0.50
+      reshaped_reward = +1 if reward >= threshold else -1
+      reshaped_rewards[reshaped_reward] += 1
+
+      for evaluation in episode:
+        evaluation.reward = reshaped_reward
+
+      dump_episode(episode, file)
   
   rewards = np.array(rewards)
   print(f'{data_points_count} data points generated!')
   print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.3f}')
+
+  wins = reshaped_rewards[+1]
+  losses = reshaped_rewards[-1]
+  percent = wins / (wins + losses) * 100
+  print(f'Reshaped reward: {wins} wins, {losses} losses ({percent:.1f}%)')
 
   return file
