@@ -20,18 +20,12 @@ def perform_iteration(config, model_path):
   episodes_file = generate_training_data(config, model_path, device)
   print()
 
-  # Retrive training data
-  data = load_evaluations(episodes_file)
-  split_ratio = 0.9
-  split_count = int(split_ratio * len(data))
-  train_data, val_data = data[:split_count], data[split_count:]
-  
   # Train
   print('TRAINING:')
-  print(f'{len(train_data) * 8} data points loaded!')
+  data = load_evaluations(episodes_file)
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
-  train_policy_value_network(model, train_data, val_data, device)
+  train_policy_value_network(model, data, device)
   torch.save(model.state_dict(), model_path)
   print()
 
@@ -42,16 +36,16 @@ def main():
   args = parser.parse_args()
 
   config = {
-    'processes' : 2,
-    'games_per_iteration' : 8,
+    'processes' : 6,
+    'games_per_iteration' : 128,
     'simulations_per_move' : 256,
-    'thread_count' : 8,
+    'thread_count' : 4,
     'c_puct' : 4.5,
     'virtual_loss' : 5,
     'batch_size' : 4
   }
 
-  # Load model
+  # Create model if does not exist
   if not os.path.exists(args.model_path):
     model = PolicyValueNetwork()
     torch.save(model.state_dict(), args.model_path)
