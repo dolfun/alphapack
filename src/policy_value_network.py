@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from container_solver import Container
 
 class ResidualBlock(nn.Module):
   def __init__(self, nr_channels):
@@ -22,9 +23,12 @@ class ResidualBlock(nn.Module):
     return out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, base_size=16, in_channels=1, additional_input_size=128, nr_residual_blocks=5):
+  def __init__(self, nr_residual_blocks=6):
     super(PolicyValueNetwork, self).__init__()
-    nr_channels = 64
+    base_size = Container.length
+    in_channels = 1
+    additional_input_size = Container.package_count * Container.values_per_package
+    nr_channels = 128
 
     self.conv_init = nn.Sequential(
       nn.Conv2d(in_channels, nr_channels, kernel_size=3, stride=1, padding=1),
@@ -43,9 +47,11 @@ class PolicyValueNetwork(nn.Module):
       nn.ReLU()
     )
 
-    fc_additional_output_size = 64
+    fc_additional_output_size = 128
     self.fc_additional = nn.Sequential(
       nn.Linear(additional_input_size, 128),
+      nn.ReLU(),
+      nn.Linear(128, 128),
       nn.ReLU(),
       nn.Linear(128, fc_additional_output_size),
       nn.ReLU()
