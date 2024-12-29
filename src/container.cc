@@ -185,7 +185,7 @@ auto Container::get_valid_state_mask(const Package& pkg) const noexcept -> Array
       auto [max_height, freq] = max_height_freq(x, y);
       if (max_height + pkg.shape.z > m_height) continue;
 
-      float min_base_contact_ratio = 0.50f;
+      float min_base_contact_ratio = 0.00f;
       float base_contact_ratio = static_cast<float>(freq) / (pkg.shape.x * pkg.shape.y);
       if (base_contact_ratio >= min_base_contact_ratio) {
         mask(x, y) = max_height;

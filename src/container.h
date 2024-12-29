@@ -22,7 +22,7 @@ public:
   auto serialize() const noexcept -> std::string;
   static Container unserialize(const std::string&);
 
-  static constexpr int length = 16;
+  static constexpr int length = 10;
   static constexpr size_t action_count = length * length;
   static constexpr size_t package_count = 32;
   static constexpr size_t values_per_package = 4;
