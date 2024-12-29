@@ -4,6 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <latch>
+#include <random>
 
 namespace mcts {
 
@@ -47,18 +48,18 @@ auto generate_episode(
     if (node->children.empty()) break;
 
     std::vector<float> priors(State::action_count);
-    int max_visit_count = -1;
-    int action_idx;
-    NodePtr<State> next_node;
+    std::vector<int> weights;
+    weights.reserve(node->children.size());
     for (auto child : node->children) {
-      if (child->visit_count > max_visit_count) {
-        max_visit_count = child->visit_count;
-        action_idx = child->action_idx;
-        next_node = child;
-      }
-
+      weights.push_back(child->visit_count);
       priors[child->action_idx] = static_cast<float>(child->visit_count) / (node->visit_count - 1);
     }
+
+    static std::random_device rd{};
+    static std::mt19937 engine { rd() };
+    std::discrete_distribution<int> dist(weights.begin(), weights.end());
+    NodePtr<State> next_node = node->children[dist(engine)];
+    int action_idx = next_node->action_idx;
 
     state_evaluations.emplace_back(*node->state, action_idx, priors);
     next_node->state = std::make_unique<State>(*node->state);
