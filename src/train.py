@@ -40,49 +40,62 @@ class ExperienceReplay(Dataset):
 @torch.no_grad()
 def validate(model, dataloader, device):
   total_loss = 0.0
+  total_priors_loss = 0.0
+  total_value_loss = 0.0
   for inputs in dataloader:
     inputs = (tensor.to(device) for tensor in list(inputs))
-    image_data, additional_data, priors, reward = inputs
+    image_data, additional_data, priors, value = inputs
 
-    predicted_priors, predicted_reward = model(image_data, additional_data)
-    loss = F.cross_entropy(predicted_priors, priors) + F.mse_loss(predicted_reward, reward)
+    predicted_priors, predicted_value = model(image_data, additional_data)
+    priors_loss = F.cross_entropy(predicted_priors, priors)
+    value_loss = F.mse_loss(predicted_value, value)
+    loss = priors_loss + value_loss
+
     total_loss += loss.item()
-  avg_loss = total_loss / len(dataloader)
-  return avg_loss
+    total_priors_loss += priors_loss.item()
+    total_value_loss += value_loss.item()
 
-prev_train_loader = prev_val_loader = None
+  total_loss /= len(dataloader)
+  total_priors_loss /= len(dataloader)
+  total_value_loss /= len(dataloader)
+  return total_loss, total_priors_loss, total_value_loss
+
 def train_policy_value_network(model, data, device):
   split_ratio = 0.9
   split_count = int(split_ratio * len(data))
   train_data, val_data = data[:split_count], data[split_count:]
   print(f'{8 * len(train_data)} data points loaded!')
-  train_loader = DataLoader(ExperienceReplay(train_data), batch_size=1024, shuffle=True)
-  val_loader = DataLoader(ExperienceReplay(val_data), batch_size=1024)
+  train_loader = DataLoader(ExperienceReplay(train_data), batch_size=128, shuffle=True)
+  val_loader = DataLoader(ExperienceReplay(val_data), batch_size=128)
 
   model.train()
-  epochs_count = 5
-  optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+  epochs_count = 4
+  optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
   for epoch in range(epochs_count):
     epoch_loss = 0.0
+    epoch_priors_loss = 0.0
+    epoch_value_loss = 0.0
     for inputs in tqdm(train_loader, leave=False):
       inputs = (tensor.to(device) for tensor in list(inputs))
-      image_data, additional_data, priors, reward = inputs
+      image_data, additional_data, priors, value = inputs
 
-      predicted_priors, predicted_reward = model(image_data, additional_data)
-      loss = F.cross_entropy(predicted_priors, priors) + F.mse_loss(predicted_reward, reward)
+      predicted_priors, predicted_value = model(image_data, additional_data)
+      priors_loss = F.cross_entropy(predicted_priors, priors)
+      value_loss = F.mse_loss(predicted_value, value)
+      loss = priors_loss + value_loss
+
       optimizer.zero_grad()
       loss.backward()
       optimizer.step()
+
       epoch_loss += loss.item()
+      epoch_priors_loss += priors_loss.item()
+      epoch_value_loss += value_loss.item()
 
-    train_loss = epoch_loss / len(train_loader)
-    val_loss = validate(model, val_loader, device)
-    print(f'Epoch [{epoch+1}/{epochs_count}] -> Train: {train_loss:.4f}, Val: {val_loss:.4f}')
-
-  global prev_train_loader, prev_val_loader
-  if not prev_train_loader is None:
-    prev_train_loss = validate(model, prev_train_loader, device)
-    prev_val_loss = validate(model, prev_val_loader, device)
-    print(f'Prev -> Train: {prev_train_loss:.4f}, Val: {prev_val_loss:.4f}')
-  prev_train_loader = train_loader
-  prev_val_loader = val_loader
+    epoch_loss /= len(train_loader)
+    epoch_priors_loss /= len(train_loader)
+    epoch_value_loss /= len(train_loader)
+    val_loss, val_priors_loss, val_value_loss = validate(model, val_loader, device)
+    print(f'Epoch [{epoch+1}/{epochs_count}] -> ', end='')
+    print(f'Train: {epoch_loss:.4f} = {epoch_priors_loss:.4f} + {epoch_value_loss:.4f}; ', end='')
+    print(f'Val: {val_loss:.4f} = {val_priors_loss:.4f} + {val_value_loss:.4f}')
