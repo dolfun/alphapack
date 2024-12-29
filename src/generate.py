@@ -67,13 +67,19 @@ def generate_training_data_wrapper(_):
 
   return episode
 
+threshold = None
 def generate_training_data(config, model_path, device):
+  global threshold
+  if threshold is None:
+    threshold = config['threshold']
+
   file = tempfile.TemporaryFile()
   rewards = []
   reshaped_rewards = { +1:0, -1:0 }
   data_points_count = 0
 
-  with Pool(config['processes'], initializer=init_worker, initargs = (config, model_path, device)) as p:
+  initargs = (config, model_path, device)
+  with Pool(config['processes'], initializer=init_worker, initargs=initargs) as p:
     episode_count = config['games_per_iteration']
     args = [None for _ in range(episode_count)]
 
@@ -84,22 +90,23 @@ def generate_training_data(config, model_path, device):
       reward = episode[-1].reward
       rewards.append(reward)
 
-      threshold = 0.50
-      reshaped_reward = +1 if reward >= threshold else -1
+      reshaped_reward = +1 if reward > threshold else -1
       reshaped_rewards[reshaped_reward] += 1
-
       for evaluation in episode:
         evaluation.reward = reshaped_reward
-
+      
       dump_episode(episode, file)
-  
-  rewards = np.array(rewards)
-  print(f'{data_points_count} data points generated!')
-  print(f'Average reward: {rewards.mean():.2} ± {rewards.std():.3f}')
 
+  rewards = np.array(rewards)
   wins = reshaped_rewards[+1]
   losses = reshaped_rewards[-1]
-  percent = wins / (wins + losses) * 100
-  print(f'Reshaped reward: {wins} wins, {losses} losses ({percent:.1f}%)')
+  win_ratio = wins / (wins + losses)
+  print(f'{data_points_count} data points generated!')
+  print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
+  print(f'Threshold: {threshold:.3f}')
+  print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')
+
+  momentum = config['threshold_momentum']
+  threshold = (1 - momentum) * threshold + momentum * rewards.mean()
 
   return file

@@ -15,8 +15,8 @@ if device != 'cuda':
     pass
 
 def perform_iteration(config, model_path):
-  # Generate Games
-  print('GENERATING GAMES:')
+  # Generate Data
+  print('GENERATING DATA:')
   episodes_file = generate_training_data(config, model_path, device)
   print()
 
@@ -36,17 +36,20 @@ def main():
   args = parser.parse_args()
 
   config = {
-    'processes' : 6,
-    'games_per_iteration' : 128,
+    'processes' : 7,
+    'games_per_iteration' : 256,
     'simulations_per_move' : 256,
-    'thread_count' : 4,
-    'c_puct' : 4.5,
-    'virtual_loss' : 5,
-    'batch_size' : 4
+    'thread_count' : 8,
+    'c_puct' : 5,
+    'virtual_loss' : 3,
+    'batch_size' : 8,
+    'threshold': 0.40,
+    'threshold_momentum': 0.95
   }
 
   # Create model if does not exist
   if not os.path.exists(args.model_path):
+    print('Creating new model!')
     model = PolicyValueNetwork()
     torch.save(model.state_dict(), args.model_path)
 
