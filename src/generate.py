@@ -98,15 +98,17 @@ def generate_training_data(config, model_path, device):
       dump_episode(episode, file)
 
   rewards = np.array(rewards)
+  mean_reward = rewards.mean()
   wins = reshaped_rewards[+1]
   losses = reshaped_rewards[-1]
   win_ratio = wins / (wins + losses)
   print(f'{data_points_count} data points generated!')
-  print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
+  print(f'Average reward: {mean_reward:.2f} ± {rewards.std():.3f}')
   print(f'Threshold: {threshold:.3f}')
   print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')
 
-  momentum = config['threshold_momentum']
-  threshold = (1 - momentum) * threshold + momentum * rewards.mean()
+  if mean_reward > threshold:
+    momentum = config['threshold_momentum']
+    threshold = (1 - momentum) * threshold + momentum * mean_reward
 
   return file

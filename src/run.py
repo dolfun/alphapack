@@ -37,13 +37,13 @@ def main():
 
   config = {
     'processes' : 7,
-    'games_per_iteration' : 256,
-    'simulations_per_move' : 256,
+    'games_per_iteration' : 1024,
+    'simulations_per_move' : 128,
     'thread_count' : 8,
     'c_puct' : 5,
     'virtual_loss' : 3,
     'batch_size' : 8,
-    'threshold': 0.40,
+    'threshold': 0.48,
     'threshold_momentum': 0.95
   }
 
