@@ -1,7 +1,7 @@
 from policy_value_network import PolicyValueNetwork
 from container_solver import generate_episode
 
-from torch.multiprocessing import Pool
+import torch.multiprocessing as mp
 from tqdm import tqdm
 import tempfile
 import pickle
@@ -74,28 +74,25 @@ def generate_training_data(config, model_path, device):
     threshold = config['threshold']
 
   file = tempfile.TemporaryFile()
-  rewards = []
-  reshaped_rewards = { +1:0, -1:0 }
-  data_points_count = 0
-
   initargs = (config, model_path, device)
-  with Pool(config['processes'], initializer=init_worker, initargs=initargs) as p:
+  with mp.Pool(config['processes'], initializer=init_worker, initargs=initargs) as p:
     episode_count = config['games_per_iteration']
     args = [None for _ in range(episode_count)]
 
     it = p.imap_unordered(generate_training_data_wrapper, args)
     for episode in tqdm(it, total=episode_count):
-      data_points_count += len(episode)
-
-      reward = episode[-1].reward
-      rewards.append(reward)
-
-      reshaped_reward = +1 if reward > threshold else -1
-      reshaped_rewards[reshaped_reward] += 1
-      for evaluation in episode:
-        evaluation.reward = reshaped_reward
-      
       dump_episode(episode, file)
+
+  evaluations = load_evaluations(file)
+  rewards = []
+  reshaped_rewards = { +1:0, -1:0 }
+  data_points_count = len(evaluations)
+  for evaluation in evaluations:
+    reward = evaluation[-1][0]
+    rewards.append(reward)
+    reshaped_reward = +1 if reward > threshold else -1
+    reshaped_rewards[reshaped_reward] += 1
+    evaluation[-1][0] = reshaped_reward
 
   rewards = np.array(rewards)
   mean_reward = rewards.mean()
@@ -111,4 +108,4 @@ def generate_training_data(config, model_path, device):
     momentum = config['threshold_momentum']
     threshold = (1 - momentum) * threshold + momentum * mean_reward
 
-  return file
+  return evaluations

@@ -23,7 +23,7 @@ class ResidualBlock(nn.Module):
     return out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, nr_residual_blocks=9):
+  def __init__(self, nr_residual_blocks=12):
     super(PolicyValueNetwork, self).__init__()
     base_size = Container.length
     in_channels = 1

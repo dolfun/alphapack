@@ -1,5 +1,5 @@
 from policy_value_network import PolicyValueNetwork
-from generate import generate_training_data, load_evaluations
+from generate import generate_training_data
 from train import train_policy_value_network
 
 import argparse
@@ -17,12 +17,11 @@ if device != 'cuda':
 def perform_iteration(config, model_path):
   # Generate Data
   print('GENERATING DATA:')
-  episodes_file = generate_training_data(config, model_path, device)
+  data = generate_training_data(config, model_path, device)
   print()
 
   # Train
   print('TRAINING:')
-  data = load_evaluations(episodes_file)
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
   train_policy_value_network(model, data, device)
@@ -36,14 +35,14 @@ def main():
   args = parser.parse_args()
 
   config = {
-    'processes' : 7,
-    'games_per_iteration' : 1024,
-    'simulations_per_move' : 128,
+    'processes' : 8,
+    'games_per_iteration' : 8192,
+    'simulations_per_move' : 150,
     'thread_count' : 8,
     'c_puct' : 5,
     'virtual_loss' : 3,
     'batch_size' : 8,
-    'threshold': 0.48,
+    'threshold': 0.49,
     'threshold_momentum': 0.95
   }
 
