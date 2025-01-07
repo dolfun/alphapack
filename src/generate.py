@@ -69,10 +69,7 @@ def generate_training_data_wrapper(_):
 
 threshold = None
 def generate_training_data(config, model_path, device):
-  global threshold
-  if threshold is None:
-    threshold = config['threshold']
-
+  rewards = []
   file = tempfile.TemporaryFile()
   initargs = (config, model_path, device)
   with mp.Pool(config['processes'], initializer=init_worker, initargs=initargs) as p:
@@ -81,31 +78,36 @@ def generate_training_data(config, model_path, device):
 
     it = p.imap_unordered(generate_training_data_wrapper, args)
     for episode in tqdm(it, total=episode_count):
+      rewards.append(episode[-1].reward)
       dump_episode(episode, file)
 
+  rewards = np.array(rewards)
+  precentile = config['percentile']
+  percentile_reward = np.percentile(rewards, precentile)
+
+  global threshold
+  if threshold is None:
+    threshold = rewards.mean()
+  if percentile_reward > threshold:
+    momentum = config['threshold_momentum']
+    threshold = (1 - momentum) * threshold + momentum * percentile_reward
+
   evaluations = load_evaluations(file)
-  rewards = []
   reshaped_rewards = { +1:0, -1:0 }
   data_points_count = len(evaluations)
   for evaluation in evaluations:
     reward = evaluation[-1][0]
-    rewards.append(reward)
     reshaped_reward = +1 if reward > threshold else -1
     reshaped_rewards[reshaped_reward] += 1
     evaluation[-1][0] = reshaped_reward
 
-  rewards = np.array(rewards)
-  mean_reward = rewards.mean()
   wins = reshaped_rewards[+1]
   losses = reshaped_rewards[-1]
   win_ratio = wins / (wins + losses)
   print(f'{data_points_count} data points generated!')
-  print(f'Average reward: {mean_reward:.2f} ± {rewards.std():.3f}')
+  print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
+  print(f'Top {precentile}% reward: {percentile_reward:.2f}')
   print(f'Threshold: {threshold:.3f}')
   print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')
-
-  if mean_reward > threshold:
-    momentum = config['threshold_momentum']
-    threshold = (1 - momentum) * threshold + momentum * mean_reward
 
   return evaluations
