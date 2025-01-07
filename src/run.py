@@ -35,15 +35,16 @@ def main():
   args = parser.parse_args()
 
   config = {
-    'processes' : 8,
-    'games_per_iteration' : 8192,
-    'simulations_per_move' : 150,
+    'processes' : 7,
+    'games_per_iteration' : 512,
+    'simulations_per_move' : 512,
     'thread_count' : 8,
     'c_puct' : 5,
     'virtual_loss' : 3,
     'batch_size' : 8,
-    'threshold': 0.49,
-    'threshold_momentum': 0.95
+
+    'percentile' : 70,
+    'threshold_momentum' : 0.75
   }
 
   # Create model if does not exist

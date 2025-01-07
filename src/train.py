@@ -67,15 +67,15 @@ def train_policy_value_network(model, data, device):
   train_data, val_data = data[:split_count], data[split_count:]
   train_dataset = ExperienceReplay(train_data, train=True)
   val_datset = ExperienceReplay(val_data)
-  train_dataloader = DataLoader(train_dataset, batch_size=512, shuffle=True)
-  val_dataloader = DataLoader(val_datset, batch_size=512, shuffle=True)
+  train_dataloader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
+  val_dataloader = DataLoader(val_datset, batch_size=2048, shuffle=True)
   print(f'{len(train_dataset)} data points loaded!')
 
   model.train()
-  epochs_count = 1
-  lr = 0.05
+  epochs = 1
+  lr = 0.01
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
-  for epoch in range(epochs_count):
+  for epoch in range(epochs):
     epoch_loss = 0.0
     epoch_priors_loss = 0.0
     epoch_value_loss = 0.0
@@ -103,7 +103,7 @@ def train_policy_value_network(model, data, device):
     epoch_loss /= len(train_dataloader)
     epoch_priors_loss /= len(train_dataloader)
     epoch_value_loss /= len(train_dataloader)
-    print(f'Epoch [{epoch+1}/{epochs_count}] -> ', end='')
+    print(f'Epoch [{epoch+1}/{epochs}] -> ', end='')
     print(f'Train: {epoch_loss:.4f} = {epoch_priors_loss:.4f} + {epoch_value_loss:.4f}; ', end='')
 
     val_loss, val_priors_loss, val_value_loss = validate(model, val_dataloader, device)
