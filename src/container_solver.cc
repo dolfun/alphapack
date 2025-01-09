@@ -41,9 +41,8 @@ PYBIND11_MODULE(container_solver, m) {
   
   // Container
   py::class_<Container, std::shared_ptr<Container>>(m, "Container")
-    .def(py::init<int, std::vector<Package>>(), py::arg("height"), py::arg("packages"))
+    .def(py::init<std::vector<Package>>(), py::arg("packages"))
 
-    .def_property_readonly("height", &Container::height)
     .def_property_readonly("packages", &Container::packages)
     .def_property_readonly("height_map", &Container::height_map)
 
@@ -57,6 +56,7 @@ PYBIND11_MODULE(container_solver, m) {
     .def("unserialize", &Container::unserialize)
 
     .def_readonly_static("length", &Container::length)
+    .def_readonly_static("height", &Container::height)
     .def_readonly_static("action_count", &Container::action_count)
     .def_readonly_static("package_count", &Container::package_count)
     .def_readonly_static("values_per_package", &Container::values_per_package)

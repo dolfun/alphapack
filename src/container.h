@@ -5,11 +5,10 @@
 
 class Container {
 public:
-  Container(int height, const std::vector<Package>& packages)
-    : m_height { height }, m_packages { packages },
+  Container(const std::vector<Package>& packages)
+    : m_packages { packages },
       m_height_map { Container::length, Container::length } {}
 
-  auto height() const noexcept -> int;
   auto packages() const noexcept -> const std::vector<Package>&;
   auto height_map() const noexcept -> const Array2D<int>&;
 
@@ -23,17 +22,17 @@ public:
   static Container unserialize(const std::string&);
 
   static constexpr int length = 10;
+  static constexpr int height = 10;
   static constexpr size_t action_count = length * length;
   static constexpr size_t package_count = 32;
   static constexpr size_t values_per_package = 4;
 
 private:
-  Container(int height, std::vector<Package>&& packages, Array2D<int>&& height_map)
-    : m_height { height }, m_packages { std::move(packages) }, m_height_map { std::move(height_map) } {}
+  Container(std::vector<Package>&& packages, Array2D<int>&& height_map)
+    : m_packages { std::move(packages) }, m_height_map { std::move(height_map) } {}
   
   auto get_valid_state_mask(const Package&) const noexcept -> Array2D<int>;
 
-  int m_height;
   std::vector<Package> m_packages;
   Array2D<int> m_height_map;
 };

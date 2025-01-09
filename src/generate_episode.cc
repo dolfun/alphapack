@@ -37,8 +37,7 @@ auto generate_episode(
     package.shape = { dist(engine), dist(engine), dist(engine) };
   }
 
-  int container_height = 10;
-  Container container { container_height, packages };
+  Container container { packages };
   EvaluationQueue evaluation_queue { batch_size, evaluate };
   auto result = mcts::generate_episode(
     container, simulations_per_move, thread_count, c_puct, virtual_loss, evaluation_queue

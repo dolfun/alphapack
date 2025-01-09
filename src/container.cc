@@ -70,10 +70,6 @@ auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<
   return res;
 }
 
-auto Container::height() const noexcept -> int {
-  return m_height;
-}
-
 auto Container::packages() const noexcept -> const std::vector<Package>& {
   return m_packages;
 }
@@ -89,7 +85,7 @@ auto Container::normalized_packages() const noexcept -> const std::vector<float>
     if (!package.is_placed) {
       float x = static_cast<float>(package.shape.x) / Container::length;
       float y = static_cast<float>(package.shape.y) / Container::length;
-      float z = static_cast<float>(package.shape.z) / m_height;
+      float z = static_cast<float>(package.shape.z) / Container::height;
       it[0] = x;
       it[1] = y;
       it[2] = z;
@@ -132,19 +128,18 @@ float Container::reward() const noexcept {
   for (auto pkg : m_packages) {
     if (pkg.is_placed) total_volume += pkg.shape.x * pkg.shape.y * pkg.shape.z;
   }
-  float packing_efficiency = total_volume / (m_height * Container::length * Container::length);
+  float packing_efficiency = total_volume / (Container::length * Container::length * Container::height);
   return packing_efficiency;
 }
 
 auto Container::serialize() const noexcept -> std::string {
   std::pair<const void*, size_t> infos[] = {
-    { &m_height, sizeof(int) },
-    { m_packages.data(), sizeof(Package) * package_count },
-    { m_height_map.data(), sizeof(int) * length * length }
+    { m_packages.data(), sizeof(Package) * Container::package_count },
+    { m_height_map.data(), sizeof(int) * Container::length * Container::length }
   };
 
   size_t total_size = 0;
-  for (auto [ptr, size] : infos) {
+  for (auto [_, size] : infos) {
     total_size += size;
   }
 
@@ -158,14 +153,12 @@ auto Container::serialize() const noexcept -> std::string {
 }
 
 Container Container::unserialize(const std::string& bytes) {
-  int height;
   std::vector<Package> packages(package_count);
-  Array2D<int> height_map(length, length);
+  Array2D<int> height_map(Container::length, Container::length);
 
   std::pair<void*, size_t> infos[] = {
-    { &height, sizeof(int) },
     { packages.data(), sizeof(Package) * package_count },
-    { height_map.data(), sizeof(int) * length * length }
+    { height_map.data(), sizeof(int) * Container::length * Container::length }
   };
 
   const char* src = &bytes[0];
@@ -174,7 +167,7 @@ Container Container::unserialize(const std::string& bytes) {
     src += size;
   }
 
-  return Container(height, std::move(packages), std::move(height_map));
+  return Container(std::move(packages), std::move(height_map));
 }
 
 auto Container::get_valid_state_mask(const Package& pkg) const noexcept -> Array2D<int> {
@@ -183,7 +176,7 @@ auto Container::get_valid_state_mask(const Package& pkg) const noexcept -> Array
   for (std::size_t x = 0; x <= mask.rows() - pkg.shape.x; ++x) {
     for (std::size_t y = 0; y <= mask.cols() - pkg.shape.y; ++y) {
       auto [max_height, freq] = max_height_freq(x, y);
-      if (max_height + pkg.shape.z > m_height) continue;
+      if (max_height + pkg.shape.z > Container::height) continue;
 
       float min_base_contact_ratio = 0.00f;
       float base_contact_ratio = static_cast<float>(freq) / (pkg.shape.x * pkg.shape.y);
