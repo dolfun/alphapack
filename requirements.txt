@@ -2,3 +2,4 @@ torch
 numpy
 mypy
 tqdm
+fastapi
