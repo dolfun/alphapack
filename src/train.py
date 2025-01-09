@@ -10,25 +10,33 @@ class ExperienceReplay(Dataset):
     self.data = data
     if train: self.data = self.__augment_data(self.data)
 
+  def __diehedral_rotations(self, image):
+    reflected_image = np.flip(image, axis=0)
+    symmetries = (
+      image,
+      np.rot90(image, k=1),
+      np.rot90(image, k=2),
+      np.rot90(image, k=-1),
+      reflected_image,
+      np.rot90(reflected_image, k=1),
+      np.rot90(reflected_image, k=2),
+      np.rot90(reflected_image, k=-1)
+    )
+    return symmetries
+
   def __augment_data(self, data):
     augmented_data = []
     for image_data, additional_data, priors, reward in data:
       image_data = image_data[0]
-      reflected = np.flip(image_data, axis=0)
-      symmetries = (
-        image_data,
-        np.rot90(image_data, k=1),
-        np.rot90(image_data, k=2),
-        np.rot90(image_data, k=-1),
-        reflected,
-        np.rot90(reflected, k=1),
-        np.rot90(reflected, k=2),
-        np.rot90(reflected, k=-1)
-      )
+      augmented_image_data = self.__diehedral_rotations(image_data)
 
-      for image_data in symmetries:
+      priors_shape = priors.shape
+      augmented_priors_data = self.__diehedral_rotations(priors.reshape(image_data.shape))
+
+      for image_data, priors in zip(augmented_image_data, augmented_priors_data):
         image_data = np.expand_dims(image_data, axis=0)
-        augmented_data.append((image_data.copy(), additional_data, priors, reward))
+        priors = np.reshape(priors, priors_shape)
+        augmented_data.append((image_data.copy(), additional_data, priors.copy(), reward))
 
     return augmented_data
   
@@ -73,7 +81,7 @@ def train_policy_value_network(model, data, device):
 
   model.train()
   epochs = 1
-  lr = 0.01
+  lr = 0.2
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
   for epoch in range(epochs):
     epoch_loss = 0.0

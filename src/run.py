@@ -20,6 +20,10 @@ def perform_iteration(config, model_path):
   data = generate_training_data(config, model_path, device)
   print()
 
+  with open('checkpoint/data.bin', 'wb') as f:
+    import pickle
+    pickle.dump(data, f)
+
   # Train
   print('TRAINING:')
   model = PolicyValueNetwork().to(device)
@@ -36,15 +40,15 @@ def main():
 
   config = {
     'processes' : 7,
-    'games_per_iteration' : 512,
-    'simulations_per_move' : 512,
+    'games_per_iteration' : 256,
+    'simulations_per_move' : 256,
     'thread_count' : 8,
-    'c_puct' : 5,
+    'c_puct' : 2,
     'virtual_loss' : 3,
     'batch_size' : 8,
 
-    'percentile' : 70,
-    'threshold_momentum' : 0.75
+    'percentile' : 60,
+    'threshold_momentum' : 0.5
   }
 
   # Create model if does not exist
