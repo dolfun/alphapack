@@ -1,5 +1,5 @@
 from policy_value_network import PolicyValueNetwork
-from container_solver import generate_episode
+from bin_packing_solver import generate_episode
 
 import torch.multiprocessing as mp
 from tqdm import tqdm
@@ -10,10 +10,10 @@ import torch
 
 def dump_episode(episode, file):
   for evaluation in episode:
-    container = evaluation.container
-    height_map = np.array(container.height_map, dtype=np.float32) / container.height
+    state = evaluation.state
+    height_map = np.array(state.height_map, dtype=np.float32) / state.bin_height
     image_data = np.expand_dims(height_map, axis=0)
-    additional_data = np.array(container.normalized_packages, dtype=np.float32)
+    additional_data = np.array(state.normalized_items, dtype=np.float32)
     priors = np.array(evaluation.priors, dtype=np.float32)
     reward = np.array([evaluation.reward], dtype=np.float32)
     pickle.dump((image_data, additional_data, priors, reward), file)
@@ -29,15 +29,15 @@ def load_evaluations(file):
   return evaluations
 
 @torch.no_grad()
-def evaluate(containers):
+def infer(states):
   global model, device
 
   image_data = []
   additional_data = []
-  for container in containers:
-    height_map = np.array(container.height_map, dtype=np.float32) / container.height
+  for state in states:
+    height_map = np.array(state.height_map, dtype=np.float32) / state.bin_height
     image_data.append(np.expand_dims(height_map, axis=0))
-    additional_data.append(np.array(container.normalized_packages, dtype=np.float32))
+    additional_data.append(np.array(state.normalized_items, dtype=np.float32))
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
@@ -62,7 +62,7 @@ def generate_training_data_wrapper(_):
   episode = generate_episode(
     config['simulations_per_move'], config['thread_count'],
     config['c_puct'], config['virtual_loss'],
-    config['batch_size'], evaluate
+    config['batch_size'], infer
   )
 
   return episode

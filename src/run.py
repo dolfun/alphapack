@@ -40,7 +40,7 @@ def main():
 
   config = {
     'processes' : 7,
-    'games_per_iteration' : 256,
+    'games_per_iteration' :  256,
     'simulations_per_move' : 256,
     'thread_count' : 8,
     'c_puct' : 2,

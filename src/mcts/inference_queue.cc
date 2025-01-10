@@ -1,11 +1,11 @@
-#include "evaluation_queue.h"
+#include "inference_queue.h"
 
-auto EvaluationQueue::enqueue(std::shared_ptr<Container> container) noexcept -> std::future<Result_t> {
-  std::promise<Result_t> promise;
+auto InferenceQueue::infer(std::shared_ptr<State> state) noexcept -> std::future<Result> {
+  std::promise<Result> promise;
   auto future = promise.get_future();
 
   std::unique_lock lock { mutex };
-  queue.emplace(container, std::move(promise));
+  queue.emplace(state, std::move(promise));
   if (queue.size() >= max_batch_size) {
     lock.unlock();
     cv.notify_one();
@@ -14,7 +14,7 @@ auto EvaluationQueue::enqueue(std::shared_ptr<Container> container) noexcept -> 
   return future;
 }
 
-void EvaluationQueue::run() noexcept {
+void InferenceQueue::run() noexcept {
   std::unique_lock lock { mutex };
   cv.wait_for(lock, std::chrono::milliseconds(2), [&] {
     return queue.size() >= max_batch_size;
@@ -25,23 +25,23 @@ void EvaluationQueue::run() noexcept {
   for (int i = 0; i < batch_count; ++i) {
     lock.lock();
     size_t batch_size = std::min(queue.size(), max_batch_size);
-    std::vector<std::shared_ptr<Container>> containers(batch_size);
-    std::vector<std::promise<Result_t>> promises(batch_size);
+    std::vector<std::shared_ptr<State>> states(batch_size);
+    std::vector<std::promise<Result>> promises(batch_size);
     for (size_t i = 0; i < batch_size; ++i) {
-      containers[i] = queue.front().first;
+      states[i] = queue.front().first;
       promises[i] = std::move(queue.front().second);
       queue.pop();
     }
     lock.unlock();
 
-    auto [priors, values] = evaluate(containers);
+    auto [priors, values] = infer_func(states);
     auto priors_ptr = static_cast<float*>(priors.request().ptr);
     auto values_ptr = static_cast<float*>(values.request().ptr);
     for (size_t i = 0; i < batch_size; ++i) {
-      Result_t result;
-      result.first.resize(Container::action_count);
-      std::memcpy(result.first.data(), priors_ptr, sizeof(float) * Container::action_count);
-      priors_ptr += Container::action_count;
+      Result result;
+      result.first.resize(State::action_count);
+      std::memcpy(result.first.data(), priors_ptr, sizeof(float) * State::action_count);
+      priors_ptr += State::action_count;
 
       result.second = values_ptr[0];
       promises[i].set_value(std::move(result));

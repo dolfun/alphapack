@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from container_solver import Container
+from bin_packing_solver import State
 
 class ResidualBlock(nn.Module):
   def __init__(self, nr_channels):
@@ -25,9 +25,9 @@ class ResidualBlock(nn.Module):
 class PolicyValueNetwork(nn.Module):
   def __init__(self, nr_residual_blocks=9):
     super(PolicyValueNetwork, self).__init__()
-    base_size = Container.length
+    base_size = State.bin_length
     in_channels = 1
-    additional_input_size = Container.package_count * Container.values_per_package
+    additional_input_size = State.item_count * State.values_per_item
     nr_channels = 96
 
     self.conv_init = nn.Sequential(

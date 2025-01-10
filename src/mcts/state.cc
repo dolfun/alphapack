@@ -1,10 +1,10 @@
-#include "container.h"
+#include "state.h"
 #include <map>
 #include <cassert>
 #include <cstring>
 #include <algorithm>
 
-glm::ivec3 get_shape_along_axes(glm::ivec3 shape, int orientation) {
+Vec3i get_shape_along_axes(Vec3i shape, int orientation) {
   static constexpr int ORIENTATIONS[6][3] = {
     { 0, 1, 2 },
     { 0, 2, 1 },
@@ -14,7 +14,7 @@ glm::ivec3 get_shape_along_axes(glm::ivec3 shape, int orientation) {
     { 2, 1, 0 },
   };
   
-  glm::ivec3 shape_along_axes;
+  Vec3i shape_along_axes;
   for (int i = 0; i < 3; ++i) {
     shape_along_axes[i] = shape[ORIENTATIONS[orientation][i]];
   }
@@ -23,7 +23,7 @@ glm::ivec3 get_shape_along_axes(glm::ivec3 shape, int orientation) {
 
 // Optimize further using max queue
 template <typename T>
-auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<std::pair<T, int>> {
+auto get_max_freq_in_window(const Array2D<T>& arr, Vec3i shape) -> Array2D<std::pair<T, int>> {
   std::size_t n_arr = arr.rows(), m_arr = arr.cols();
   std::size_t n_shape = shape.x, m_shape = shape.y;
 
@@ -70,22 +70,22 @@ auto get_max_freq_in_window(const Array2D<T>& arr, glm::ivec3 shape) -> Array2D<
   return res;
 }
 
-auto Container::packages() const noexcept -> const std::vector<Package>& {
-  return m_packages;
+auto State::items() const noexcept -> const std::vector<Item>& {
+  return m_items;
 }
 
-auto Container::height_map() const noexcept -> const Array2D<int>& {
+auto State::height_map() const noexcept -> const Array2D<int>& {
   return m_height_map;
 }
 
-auto Container::normalized_packages() const noexcept -> const std::vector<float> {
-  std::vector<float> data(package_count * values_per_package);
+auto State::normalized_items() const noexcept -> const std::vector<float> {
+  std::vector<float> data(item_count * values_per_item);
   auto it = data.begin();
-  for (const auto& package : m_packages) {
-    if (!package.is_placed) {
-      float x = static_cast<float>(package.shape.x) / Container::length;
-      float y = static_cast<float>(package.shape.y) / Container::length;
-      float z = static_cast<float>(package.shape.z) / Container::height;
+  for (const auto& item : m_items) {
+    if (!item.placed) {
+      float x = static_cast<float>(item.shape.x) / State::bin_length;
+      float y = static_cast<float>(item.shape.y) / State::bin_length;
+      float z = static_cast<float>(item.shape.z) / State::bin_height;
       it[0] = x;
       it[1] = y;
       it[2] = z;
@@ -96,9 +96,9 @@ auto Container::normalized_packages() const noexcept -> const std::vector<float>
   return data;
 }
 
-auto Container::possible_actions() const -> std::vector<int> {
+auto State::possible_actions() const -> std::vector<int> {
   std::vector<int> actions;
-  auto mask = get_valid_state_mask(m_packages.front());
+  auto mask = get_valid_state_mask(m_items.front());
   for (int x = 0; x < mask.rows(); ++x) {
     for (int y = 0; y < mask.cols(); ++y) {
       if (mask(x, y) >= 0) {
@@ -109,12 +109,12 @@ auto Container::possible_actions() const -> std::vector<int> {
   return actions;
 }
 
-void Container::transition(int action_idx) {
-  assert(action_idx >= 0 && action_idx < Container::action_count);
-  auto shape = m_packages.front().shape;
-  m_packages.front().is_placed = true;
-  std::rotate(m_packages.begin(), m_packages.begin() + 1, m_packages.end());
-  int x0 = action_idx / Container::length, y0 = action_idx % Container::length;
+void State::transition(int action_idx) {
+  assert(action_idx >= 0 && action_idx < State::action_count);
+  auto shape = m_items.front().shape;
+  m_items.front().placed = true;
+  std::rotate(m_items.begin(), m_items.begin() + 1, m_items.end());
+  int x0 = action_idx / State::bin_length, y0 = action_idx % State::bin_length;
   for (int x = x0; x < x0 + shape.x; ++x) {
     for (int y = y0; y < y0 + shape.y; ++y) {
       m_height_map(x, y) += shape.z;
@@ -123,19 +123,19 @@ void Container::transition(int action_idx) {
   }
 }
 
-float Container::reward() const noexcept {
+float State::reward() const noexcept {
   float total_volume = 0.0f;
-  for (auto pkg : m_packages) {
-    if (pkg.is_placed) total_volume += pkg.shape.x * pkg.shape.y * pkg.shape.z;
+  for (auto pkg : m_items) {
+    if (pkg.placed) total_volume += pkg.shape.x * pkg.shape.y * pkg.shape.z;
   }
-  float packing_efficiency = total_volume / (Container::length * Container::length * Container::height);
+  float packing_efficiency = total_volume / (State::bin_length * State::bin_length * State::bin_height);
   return packing_efficiency;
 }
 
-auto Container::serialize() const noexcept -> std::string {
+auto State::serialize() const noexcept -> std::string {
   std::pair<const void*, size_t> infos[] = {
-    { m_packages.data(), sizeof(Package) * Container::package_count },
-    { m_height_map.data(), sizeof(int) * Container::length * Container::length }
+    { m_items.data(), sizeof(Item) * State::item_count },
+    { m_height_map.data(), sizeof(int) * State::bin_length * State::bin_length }
   };
 
   size_t total_size = 0;
@@ -152,13 +152,13 @@ auto Container::serialize() const noexcept -> std::string {
   return bytes;
 }
 
-Container Container::unserialize(const std::string& bytes) {
-  std::vector<Package> packages(package_count);
-  Array2D<int> height_map(Container::length, Container::length);
+State State::unserialize(const std::string& bytes) {
+  std::vector<Item> items(item_count);
+  Array2D<int> height_map(State::bin_length, State::bin_length);
 
   std::pair<void*, size_t> infos[] = {
-    { packages.data(), sizeof(Package) * package_count },
-    { height_map.data(), sizeof(int) * Container::length * Container::length }
+    { items.data(), sizeof(Item) * item_count },
+    { height_map.data(), sizeof(int) * State::bin_length * State::bin_length }
   };
 
   const char* src = &bytes[0];
@@ -167,16 +167,16 @@ Container Container::unserialize(const std::string& bytes) {
     src += size;
   }
 
-  return Container(std::move(packages), std::move(height_map));
+  return State(std::move(items), std::move(height_map));
 }
 
-auto Container::get_valid_state_mask(const Package& pkg) const noexcept -> Array2D<int> {
-  Array2D<int> mask { Container::length, Container::length, -1 };
+auto State::get_valid_state_mask(const Item& pkg) const noexcept -> Array2D<int> {
+  Array2D<int> mask { State::bin_length, State::bin_length, -1 };
   auto max_height_freq = get_max_freq_in_window(m_height_map, pkg.shape);
   for (std::size_t x = 0; x <= mask.rows() - pkg.shape.x; ++x) {
     for (std::size_t y = 0; y <= mask.cols() - pkg.shape.y; ++y) {
       auto [max_height, freq] = max_height_freq(x, y);
-      if (max_height + pkg.shape.z > Container::height) continue;
+      if (max_height + pkg.shape.z > State::bin_height) continue;
 
       float min_base_contact_ratio = 0.00f;
       float base_contact_ratio = static_cast<float>(freq) / (pkg.shape.x * pkg.shape.y);

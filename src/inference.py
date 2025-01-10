@@ -1,4 +1,4 @@
-from container_solver import Container
+from bin_packing_solver import State
 from fastapi import Request, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,7 +13,7 @@ if device != 'cuda':
   except ImportError:
     pass
 
-model_path = './temp/policy_value_network.pth'
+model_path = './temp/policy_value_network.pth.bak'
 model = PolicyValueNetwork().to(device)
 model.load_state_dict(torch.load(model_path, weights_only=False))
 model.eval()
@@ -31,9 +31,9 @@ app.add_middleware(
 @app.get('/info')
 async def info():
   info = {
-    'length': Container.length,
-    'height': Container.height,
-    'nrPackages': Container.package_count
+    'length': State.bin_length,
+    'height': State.bin_height,
+    'itemCount': State.item_count
   }
   return info
 
@@ -41,17 +41,17 @@ async def info():
 async def infer(request: Request):
   data = await request.json()
   image_data = torch.tensor(data['height_map'], dtype=torch.float32, device=device)
-  image_data /= Container.height
-  image_data = image_data.view((1, 1, Container.length, Container.length))
+  image_data /= State.bin_height
+  image_data = image_data.view((1, 1, State.bin_length, State.bin_length))
 
   additional_data = []
-  for package in data['packages']:
-    if package['isPlaced']:
+  for item in data['items']:
+    if item['isPlaced']:
       additional_data.extend([0, 0, 0, 0])
     else:
-      l = package['length'] / Container.length
-      w = package['width'] / Container.length
-      h = package['height'] / Container.height
+      l = item['length'] / State.bin_length
+      w = item['width'] / State.bin_length
+      h = item['height'] / State.bin_height
       additional_data.append(l)
       additional_data.append(w)
       additional_data.append(h)
@@ -62,7 +62,7 @@ async def infer(request: Request):
     additional_data = torch.unsqueeze(additional_data, dim=0)
 
     priors, value = model(image_data, additional_data)
-    priors = torch.softmax(torch.squeeze(priors).flatten(), dim=1)
+    priors = torch.softmax(torch.squeeze(priors).flatten(), dim=0)
     value = torch.squeeze(value)
 
   data = {

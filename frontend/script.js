@@ -25,12 +25,12 @@ class Grid {
   constructor(info) {
     this.info = info;
 
-    const gridContainer = document.getElementById('grid');
-    gridContainer.innerHTML = '';
+    const gridElement = document.getElementById('grid');
+    gridElement.innerHTML = '';
 
     const cellSize = 40;
     const cellMargin = 3;
-    gridContainer.style.width = `${info.length * (cellSize + 2 * cellMargin)}px`;
+    gridElement.style.width = `${info.length * (cellSize + 2 * cellMargin)}px`;
 
     const cells = [];
     for (let i = 0; i < info.length; ++i) {
@@ -44,11 +44,12 @@ class Grid {
         cell.value = 0;
         cell.textContent = '0';
         cell.style.backgroundColor = this.getCellColor(cell);
-        gridContainer.appendChild(cell);
+        gridElement.appendChild(cell);
 
         cells[i][j] = cell;
       }
     }
+
     this.cells = cells;
     this.inferenceMode = false;
   }
@@ -103,58 +104,58 @@ class Grid {
   }
 }
 
-function createPackages(info) {
+function createitems(info) {
   const rng = new RNG(67666);
 
-  const packages = [];
-  for (let i = 0; i < info.nrPackages; ++i) {
-    packages.push({
+  const items = [];
+  for (let i = 0; i < info.itemCount; ++i) {
+    items.push({
       length: rng.randint(2, 5),
       width : rng.randint(2, 5),
       height: rng.randint(2, 5),
       isPlaced: false
     });
   }
-  return packages;
+  return items;
 }
 
-function renderPackages(packages) {
-  const list = document.getElementById('packagesList');
+function renderitems(items) {
+  const list = document.getElementById('itemsList');
   list.innerHTML = '';
 
-  packages.forEach((package, index) => {
+  items.forEach((item, index) => {
     if (index >= 10) return;
 
-    const item = document.createElement('div');
-    item.className = 'list-item';
-    item.textContent = `${package.length}x${package.width}x${package.height}`;
-    if (index === 0) item.style.fontWeight = 'bold';
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.textContent = `${item.length}x${item.width}x${item.height}`;
+    if (index === 0) div.style.fontWeight = 'bold';
 
-    list.appendChild(item);
+    list.appendChild(div);
   });
 }
 
-function updateHeadings(info, packages) {
-  const containerHeading = document.getElementById('containerHeading');
+function updateHeadings(info, items) {
+  const stateHeading = document.getElementById('stateHeading');
   const listHeading = document.getElementById('listHeading');
 
   let placedCount = 0, placedVolume = 0;
-  packages.forEach((package, _) => {
-    if (!package.isPlaced) return;
+  items.forEach((item, _) => {
+    if (!item.isPlaced) return;
     ++placedCount;
 
-    placedVolume += package.length * package.width * package.height;
+    placedVolume += item.length * item.width * item.height;
   });
 
   let packingEfficiency = 100 * placedVolume / (info.length * info.length * info.height);
-  containerHeading.innerText = `Packing Efficiency: ${packingEfficiency.toFixed(2)}%`;
-  listHeading.innerText = `\n\nPackages Used: ${placedCount}`;
+  stateHeading.innerText = `Packing Efficiency: ${packingEfficiency.toFixed(2)}%`;
+  listHeading.innerText = `\n\nitems Used: ${placedCount}`;
 }
 
-function updateInferenceInfo(grid, packages) {
-  const gridContainer = document.getElementById('grid');
+function updateInferenceInfo(grid, items) {
+  const gridElement = document.getElementById('grid');
   const inferenceInfo = document.getElementById('inferenceInfo');
-  inferenceInfo.textContent = `Value: ${gridContainer.inferenceData.value.toFixed(2)}`
+  inferenceInfo.textContent = `Value: ${gridElement.inferenceData.value.toFixed(2)}`
 
   const inferenceLabel = document.getElementById('inferenceLabel');
   if (inferenceLabel.children.length == 0) {
@@ -176,9 +177,9 @@ function updateInferenceInfo(grid, packages) {
       grid.inferenceMode = false;
     }
 
-    const { length, width, height } = packages[0];
+    const { length, width, height } = items[0];
     let priors_sum = 0;
-    const priors = gridContainer.inferenceData.priors;
+    const priors = gridElement.inferenceData.priors;
     for (let i = 0; i < grid.info.length; ++i) {
       for (let j = 0; j < grid.info.length; ++j) {
         const index = i * grid.info.length + j;
@@ -197,7 +198,7 @@ function updateInferenceInfo(grid, packages) {
     for (let i = 0; i < grid.info.length; ++i) {
       for (let j = 0; j < grid.info.length; ++j) {
         const index = i * grid.info.length + j;
-        const prior = gridContainer.inferenceData.priors[index];
+        const prior = gridElement.inferenceData.priors[index];
 
         let color = null;
         if (inferenceCheckbox.checked) {
@@ -217,15 +218,15 @@ function updateInferenceInfo(grid, packages) {
   });
 }
 
-function addEventListeners(info, grid, packages) {
+function addEventListeners(info, grid, items) {
   for (let i = 0; i < grid.info.length; ++i) {
     for (let j = 0; j < grid.info.length; ++j) {
       const cell = grid.cells[i][j];
       cell.addEventListener('click', () => {
-        if (grid.inferenceMode || packages[0].isPlaced) return;
+        if (grid.inferenceMode || items[0].isPlaced) return;
 
-        const topPackage = packages[0];
-        const { length, width, height } = topPackage;
+        const topitem = items[0];
+        const { length, width, height } = topitem;
         if (!grid.isValidPlacement(i, j, length, width, height)) return;
 
         grid.removeHover(0, 0, grid.length, grid.length);
@@ -235,35 +236,35 @@ function addEventListeners(info, grid, packages) {
           cell.style.backgroundColor = grid.getCellColor(cell);
         });
 
-        packages.shift();
-        topPackage.isPlaced = true;
-        packages.push(topPackage);
+        items.shift();
+        topitem.isPlaced = true;
+        items.push(topitem);
 
-        getInferenceData(grid, packages);
-        renderPackages(packages);
-        updateHeadings(info, packages);
+        getInferenceData(grid, items);
+        renderitems(items);
+        updateHeadings(info, items);
 
         cell.dispatchEvent(new MouseEvent('mouseenter'));
       });
 
       cell.addEventListener('mouseenter', () => {
-        if (grid.inferenceMode || packages[0].isPlaced) return;
-        const { length, width, height } = packages[0];
+        if (grid.inferenceMode || items[0].isPlaced) return;
+        const { length, width, height } = items[0];
         grid.applyHover(i, j, length, width, height);
       });
 
       cell.addEventListener('mouseleave', () => {
-        if (grid.inferenceMode || packages[0].isPlaced) return;
-        const { length, width, _ } = packages[0];
+        if (grid.inferenceMode || items[0].isPlaced) return;
+        const { length, width, _ } = items[0];
         grid.removeHover(i, j, length, width);
       });
     }
   }
 }
 
-function getInferenceData(grid, packages) {
-  const gridContainer = document.getElementById('grid');
-  gridContainer.inferenceData = null;
+function getInferenceData(grid, items) {
+  const gridElement = document.getElementById('grid');
+  gridElement.inferenceData = null;
 
   const gridData = [];
   for (let i = 0; i < grid.info.length; ++i) {
@@ -274,7 +275,7 @@ function getInferenceData(grid, packages) {
 
   const data = {
     'height_map': gridData,
-    'packages': packages
+    'items': items
   };
 
   const ipInput = document.getElementById('ipInput');
@@ -293,8 +294,8 @@ function getInferenceData(grid, packages) {
     return response.json();
   })
   .then(data => {
-    gridContainer.inferenceData = data;
-    updateInferenceInfo(grid, packages);
+    gridElement.inferenceData = data;
+    updateInferenceInfo(grid, items);
   })
   .catch(error => {
     alert(error);
@@ -303,12 +304,11 @@ function getInferenceData(grid, packages) {
 
 function main(info) {
   const grid = new Grid(info);
-  const packages = createPackages(info);
-  renderPackages(packages);
-  updateHeadings(info, packages);
-  addEventListeners(info, grid, packages);
-
-  getInferenceData(grid, packages);
+  const items = createitems(info);
+  renderitems(items);
+  updateHeadings(info, items);
+  addEventListeners(info, grid, items);
+  getInferenceData(grid, items);
 }
 
 const connectButton = document.getElementById('connectButton');
@@ -323,7 +323,7 @@ connectButton.addEventListener('click', () => {
       return response.json();
     })
     .then(info => {
-      main(info);
+    main(info);
     })
     .catch(error => {
       alert(error);
