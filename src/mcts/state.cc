@@ -4,23 +4,6 @@
 #include <cstring>
 #include <algorithm>
 
-Vec3i get_shape_along_axes(Vec3i shape, int orientation) {
-  static constexpr int ORIENTATIONS[6][3] = {
-    { 0, 1, 2 },
-    { 0, 2, 1 },
-    { 1, 0, 2 },
-    { 1, 2, 0 },
-    { 2, 0, 1 },
-    { 2, 1, 0 },
-  };
-  
-  Vec3i shape_along_axes;
-  for (int i = 0; i < 3; ++i) {
-    shape_along_axes[i] = shape[ORIENTATIONS[orientation][i]];
-  }
-  return shape_along_axes;
-}
-
 // Optimize further using max queue
 template <typename T>
 auto get_max_freq_in_window(const Array2D<T>& arr, Vec3i shape) -> Array2D<std::pair<T, int>> {

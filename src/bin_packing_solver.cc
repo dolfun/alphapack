@@ -28,7 +28,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
   py::class_<Item>(m, "Item")
     .def(py::init<>())
     .def_readwrite("shape", &Item::shape)
-    .def_readwrite("is_placed", &Item::placed)
+    .def_readwrite("placed", &Item::placed)
     .def_readwrite("pos", &Item::pos);
 
   // Array2D<int>
@@ -86,13 +86,17 @@ PYBIND11_MODULE(bin_packing_solver, m) {
 
   // generate episode
   m.def(
-    "generate_episode",
-    &mcts::generate_episode,
+    "generate_episodes",
+    &mcts::generate_episodes,
+    py::arg("seed"),
+    py::arg("seed_pool_size"),
+    py::arg("episodes_count"),
+    py::arg("worker_count"),
     py::arg("simulations_per_move"),
-    py::arg("thread_count"),
+    py::arg("mcts_thread_count"),
+    py::arg("batch_size"),
     py::arg("c_puct"),
     py::arg("virtual_loss"),
-    py::arg("batch_size"),
-    py::arg("evaluate")
+    py::arg("infer_func")
   );
 }

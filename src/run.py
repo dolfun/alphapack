@@ -1,7 +1,8 @@
 from policy_value_network import PolicyValueNetwork
-from generate import generate_training_data
 from train import train_policy_value_network
+from generate import generate_training_data
 
+from dataclasses import dataclass
 import argparse
 import torch
 import os
@@ -13,6 +14,22 @@ if device != 'cuda':
     device = torch_directml.device()
   except ImportError:
     pass
+
+@dataclass
+class Config:
+  seed: int
+  seed_pool_size: int
+  episodes_per_iteration: int
+  processes: int
+  step_size: int
+  workers_per_process: int
+  simulations_per_move: int
+  mcts_thread_count: int
+  batch_size: int
+  c_puct: float
+  virtual_loss: int
+  threshold_percentile: int
+  threshold_momentum: float
 
 def perform_iteration(config, model_path):
   # Generate Data
@@ -38,18 +55,21 @@ def main():
   parser.add_argument('--model_path', default='policy_value_network.pth')
   args = parser.parse_args()
 
-  config = {
-    'processes' : 7,
-    'games_per_iteration' :  256,
-    'simulations_per_move' : 256,
-    'thread_count' : 8,
-    'c_puct' : 2,
-    'virtual_loss' : 3,
-    'batch_size' : 8,
-
-    'percentile' : 60,
-    'threshold_momentum' : 0.5
-  }
+  config = Config(
+    seed=2389473453,
+    seed_pool_size=2048,
+    episodes_per_iteration=512,
+    processes=4,
+    step_size=32,
+    workers_per_process=16,
+    simulations_per_move=256,
+    mcts_thread_count=8,
+    batch_size=32,
+    c_puct=5,
+    virtual_loss=3,
+    threshold_percentile=70,
+    threshold_momentum=0.5
+  )
 
   # Create model if does not exist
   if not os.path.exists(args.model_path):
