@@ -1,8 +1,9 @@
+import torch.jit as jit
 import torch
 from torch import nn
 from bin_packing_solver import State
 
-class ResidualBlock(nn.Module):
+class ResidualBlock(jit.ScriptModule):
   def __init__(self, nr_channels):
     super(ResidualBlock, self).__init__()
     self.conv1 = nn.Conv2d(nr_channels, nr_channels, kernel_size=3, stride=1, padding=1)
@@ -11,6 +12,7 @@ class ResidualBlock(nn.Module):
     self.conv2 = nn.Conv2d(nr_channels, nr_channels, kernel_size=3, stride=1, padding=1)
     self.bn2 = nn.BatchNorm2d(nr_channels)
 
+  @jit.script_method
   def forward(self, x):
     residual = x
     out = self.conv1(x)
@@ -22,7 +24,7 @@ class ResidualBlock(nn.Module):
     out = self.relu(out)
     return out
 
-class PolicyValueNetwork(nn.Module):
+class PolicyValueNetwork(jit.ScriptModule):
   def __init__(self, nr_residual_blocks=9):
     super(PolicyValueNetwork, self).__init__()
     base_size = State.bin_length
@@ -76,6 +78,7 @@ class PolicyValueNetwork(nn.Module):
       nn.Tanh()
     )
 
+  @jit.script_method
   def forward(self, in_image, in_additional):
     out_image = self.conv_init(in_image)
 
