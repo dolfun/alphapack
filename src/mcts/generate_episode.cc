@@ -31,6 +31,7 @@ namespace mcts {
 
 auto generate_episode(
   const State& state,
+  int move_threshold,
   int simulations_per_move,
   int thread_count,
   float c_puct,
@@ -63,16 +64,24 @@ auto generate_episode(
     if (node->children.empty()) break;
 
     std::vector<float> priors(State::action_count);
+    int max_visit_count = -1;
     std::vector<int> weights;
     weights.reserve(node->children.size());
     for (auto child : node->children) {
+      max_visit_count = std::max(max_visit_count, child->visit_count.load());
       weights.push_back(child->visit_count);
       priors[child->action_idx] = static_cast<float>(child->visit_count) / (node->visit_count - 1);
     }
 
+    if (std::ssize(episode) >= move_threshold) {
+      for (auto& weight : weights) {
+        weight = (weight == max_visit_count);
+      }
+    }
+
     static std::random_device rd{};
     static std::mt19937 engine { rd() };
-    std::discrete_distribution<int> dist(weights.begin(), weights.end());
+    std::discrete_distribution<size_t> dist(weights.begin(), weights.end());
     NodePtr next_node = node->children[dist(engine)];
     int action_idx = next_node->action_idx;
 
@@ -95,6 +104,7 @@ auto generate_episodes(
   int seed_pool_size,
   int episodes_count,
   int worker_count,
+  int move_threshold,
   int simulations_per_move,
   int mcts_thread_count,
   float c_puct,
@@ -122,6 +132,7 @@ auto generate_episodes(
     State state { items };
     auto episode = generate_episode(
       state,
+      move_threshold,
       simulations_per_move,
       mcts_thread_count,
       c_puct,

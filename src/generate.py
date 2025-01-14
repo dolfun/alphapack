@@ -59,6 +59,7 @@ def generate_episodes_wrapper(episodes_count):
     config.seed_pool_size,
     episodes_count,
     config.workers_per_process,
+    config.move_threshold,
     config.simulations_per_move,
     config.mcts_thread_count,
     config.c_puct,

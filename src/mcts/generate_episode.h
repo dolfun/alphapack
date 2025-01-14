@@ -9,6 +9,7 @@ auto generate_episodes(
   int seed_pool_size,
   int episodes_count,
   int worker_count,
+  int move_threshold,
   int simulations_per_move,
   int mcts_thread_count,
   float c_puct,

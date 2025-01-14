@@ -92,6 +92,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     py::arg("seed_pool_size"),
     py::arg("episodes_count"),
     py::arg("worker_count"),
+    py::arg("move_threshold"),
     py::arg("simulations_per_move"),
     py::arg("mcts_thread_count"),
     py::arg("c_puct"),

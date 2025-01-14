@@ -23,6 +23,7 @@ class Config:
   processes: int
   step_size: int
   workers_per_process: int
+  move_threshold: int
   simulations_per_move: int
   mcts_thread_count: int
   batch_size: int
@@ -64,12 +65,13 @@ def main():
     processes=4,
     step_size=32,
     workers_per_process=16,
+    move_threshold=4,
     simulations_per_move=256,
     mcts_thread_count=8,
     batch_size=32,
     c_puct=5,
     virtual_loss=3,
-    threshold_momentum=0.75
+    threshold_momentum=0.5
   )
 
   # Create model if does not exist
