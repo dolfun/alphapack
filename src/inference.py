@@ -13,7 +13,7 @@ if device != 'cuda':
   except ImportError:
     pass
 
-model_path = './temp/policy_value_network.pth.bak'
+model_path = './temp/policy_value_network.pth'
 model = PolicyValueNetwork().to(device)
 model.load_state_dict(torch.load(model_path, weights_only=False))
 model.eval()

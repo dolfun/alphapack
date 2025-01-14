@@ -1,6 +1,6 @@
 from policy_value_network import PolicyValueNetwork
 from train import train_policy_value_network
-from generate import generate_training_data
+from generate import generate_training_samples
 
 from dataclasses import dataclass
 import argparse
@@ -28,24 +28,23 @@ class Config:
   batch_size: int
   c_puct: float
   virtual_loss: int
-  threshold_percentile: int
   threshold_momentum: float
 
 def perform_iteration(config, model_path):
-  # Generate Data
-  print('GENERATING DATA:')
-  data = generate_training_data(config, model_path, device)
+  # Generate Samples
+  print('GENERATING SAMPLES:')
+  samples = generate_training_samples(config, model_path, device)
   print()
 
-  with open('checkpoint/data.bin', 'wb') as f:
+  with open('checkpoint/samples.bin', 'wb') as f:
     import pickle
-    pickle.dump(data, f)
+    pickle.dump(samples, f)
 
   # Train
   print('TRAINING:')
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
-  train_policy_value_network(model, data, device)
+  train_policy_value_network(model, samples, device)
   torch.save(model.state_dict(), model_path)
   print()
 
@@ -67,8 +66,7 @@ def main():
     batch_size=32,
     c_puct=5,
     virtual_loss=3,
-    threshold_percentile=70,
-    threshold_momentum=0.5
+    threshold_momentum=0.75
   )
 
   # Create model if does not exist

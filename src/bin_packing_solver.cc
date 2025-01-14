@@ -84,7 +84,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
       }
     ));
 
-  // generate episode
+  // generate_episodes
   m.def(
     "generate_episodes",
     &mcts::generate_episodes,

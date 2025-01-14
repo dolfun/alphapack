@@ -1,50 +1,25 @@
+from augment_sample import augment_sample
 from tqdm import tqdm
-import numpy as np
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 class ExperienceReplay(Dataset):
-  def __init__(self, data, train=False):
-    self.data = data
-    if train: self.data = self.__augment_data(self.data)
-
-  def __diehedral_rotations(self, image):
-    reflected_image = np.flip(image, axis=0)
-    symmetries = (
-      image,
-      np.rot90(image, k=1),
-      np.rot90(image, k=2),
-      np.rot90(image, k=-1),
-      reflected_image,
-      np.rot90(reflected_image, k=1),
-      np.rot90(reflected_image, k=2),
-      np.rot90(reflected_image, k=-1)
-    )
-    return symmetries
-
-  def __augment_data(self, data):
-    augmented_data = []
-    for image_data, additional_data, priors, reward in data:
-      image_data = image_data[0]
-      augmented_image_data = self.__diehedral_rotations(image_data)
-
-      priors_shape = priors.shape
-      augmented_priors_data = self.__diehedral_rotations(priors.reshape(image_data.shape))
-
-      for image_data, priors in zip(augmented_image_data, augmented_priors_data):
-        image_data = np.expand_dims(image_data, axis=0)
-        priors = np.reshape(priors, priors_shape)
-        augmented_data.append((image_data.copy(), additional_data, priors.copy(), reward))
-
-    return augmented_data
+  def __init__(self, samples, train=False):
+    self.samples = samples
+    if train:
+      self.samples = [
+        augmented_sample
+        for sample in self.samples
+        for augmented_sample in augment_sample(sample)
+      ]
   
   def __len__(self):
-    return len(self.data)
+    return len(self.samples)
 
   def __getitem__(self, idx):
-    return self.data[idx]
+    return self.samples[idx]
 
 @torch.no_grad()
 def validate(model, dataloader, device):
@@ -69,19 +44,19 @@ def validate(model, dataloader, device):
   total_value_loss /= len(dataloader)
   return total_loss, total_priors_loss, total_value_loss
 
-def train_policy_value_network(model, data, device):
+def train_policy_value_network(model, samples, device):
   split_ratio = 0.9
-  split_count = int(split_ratio * len(data))
-  train_data, val_data = data[:split_count], data[split_count:]
-  train_dataset = ExperienceReplay(train_data, train=True)
-  val_datset = ExperienceReplay(val_data)
+  split_count = int(split_ratio * len(samples))
+  train_samples, val_samples = samples[:split_count], samples[split_count:]
+  train_dataset = ExperienceReplay(train_samples, train=True)
+  val_datset = ExperienceReplay(val_samples)
   train_dataloader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
   val_dataloader = DataLoader(val_datset, batch_size=2048, shuffle=True)
-  print(f'{len(train_dataset)} data points loaded!')
+  print(f'{len(train_dataset)} samples loaded!')
 
   model.train()
   epochs = 1
-  lr = 0.2
+  lr = 0.02
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
   for epoch in range(epochs):
     epoch_loss = 0.0

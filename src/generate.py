@@ -1,5 +1,5 @@
 from policy_value_network import PolicyValueNetwork
-from bin_packing_solver import generate_episodes
+from bin_packing_solver import State, generate_episodes
 
 import torch.multiprocessing as mp
 from tqdm import tqdm
@@ -12,7 +12,7 @@ def dump_episode(episode, file):
   episode_data = []
   for evaluation in episode:
     state = evaluation.state
-    height_map = np.array(state.height_map, dtype=np.float32) / state.bin_height
+    height_map = np.array(state.height_map, dtype=np.float32) / State.bin_height
     image_data = np.expand_dims(height_map, axis=0)
     additional_data = np.array(state.normalized_items, dtype=np.float32)
     priors = np.array(evaluation.priors, dtype=np.float32)
@@ -45,12 +45,15 @@ def init_worker(_config, model_path, _device):
 def infer(states):
   global model, device
 
-  image_data = []
-  additional_data = []
-  for state in states:
-    height_map = np.array(state.height_map, dtype=np.float32) / state.bin_height
-    image_data.append(np.expand_dims(height_map, axis=0))
-    additional_data.append(np.array(state.normalized_items, dtype=np.float32))
+  image_data = [
+    np.array(np.expand_dims(state.height_map, axis=0), dtype=np.float32) / State.bin_height
+    for state in states
+  ]
+
+  additional_data = [
+    np.array(state.normalized_items, dtype=np.float32)
+    for state in states
+  ]
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
@@ -59,7 +62,7 @@ def infer(states):
   result = (policy.cpu().numpy(), value.cpu().numpy())
   return result
 
-def generate_training_data_wrapper(episodes_count):
+def generate_training_samples_wrapper(episodes_count):
   global config, model, device
 
   episodes = generate_episodes(
@@ -78,27 +81,27 @@ def generate_training_data_wrapper(episodes_count):
   return episodes
 
 threshold = None
-def generate_training_data(config, model_path, device):
+def generate_training_samples(config, model_path, device):
   file = tempfile.TemporaryFile()
   initargs = (config, model_path, device)
   with mp.Pool(config.processes, initializer=init_worker, initargs=initargs) as pool:
     steps_count = (config.episodes_per_iteration + config.step_size - 1) // config.step_size
     args = [config.step_size for _ in range(steps_count)]
-    it = pool.imap_unordered(generate_training_data_wrapper, args)
+    it = pool.imap_unordered(generate_training_samples_wrapper, args)
     for episodes in tqdm(it, total=steps_count):
       for episode in episodes:
         dump_episode(episode, file)
 
   episodes = load_episodes(file)
   rewards = np.array([episode[0][-1][0] for episode in episodes])
-  percentile_reward = np.percentile(rewards, config.threshold_percentile)
+  mean_reward = rewards.mean()
 
   global threshold
   if threshold is None:
-    threshold = rewards.mean()
-  if percentile_reward > threshold:
+    threshold = mean_reward
+  if mean_reward > threshold:
     momentum = config.threshold_momentum
-    threshold = (1 - momentum) * threshold + momentum * percentile_reward
+    threshold = (1 - momentum) * threshold + momentum * mean_reward
 
   reshaped_rewards = { +1:0, -1:0 }
   evaluations = []
@@ -111,13 +114,12 @@ def generate_training_data(config, model_path, device):
 
     evaluations.extend(episode)
 
-  data_points_count = len(evaluations)
+  sample_count = len(evaluations)
   wins = reshaped_rewards[+1]
   losses = reshaped_rewards[-1]
   win_ratio = wins / (wins + losses)
-  print(f'{data_points_count} data points generated!')
+  print(f'{sample_count} samples generated!')
   print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
-  print(f'Top {config.threshold_percentile}% reward: {percentile_reward:.2f}')
   print(f'Threshold: {threshold:.3f}')
   print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')
 
