@@ -94,9 +94,9 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     py::arg("worker_count"),
     py::arg("simulations_per_move"),
     py::arg("mcts_thread_count"),
-    py::arg("batch_size"),
     py::arg("c_puct"),
     py::arg("virtual_loss"),
+    py::arg("batch_size"),
     py::arg("infer_func")
   );
 }

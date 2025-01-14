@@ -1,9 +1,24 @@
+from bin_packing_solver import State
 from augment_sample import augment_sample
 from tqdm import tqdm
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+
+def prepare_samples(episodes):
+  samples = []
+  for episode in episodes:
+    for evaluation in episode:
+      state = evaluation.state
+      height_map = np.array(state.height_map, dtype=np.float32) / State.bin_height
+      image_data = np.expand_dims(height_map, axis=0)
+      additional_data = np.array(state.normalized_items, dtype=np.float32)
+      priors = np.array(evaluation.priors, dtype=np.float32)
+      reward = np.array([evaluation.reward], dtype=np.float32)
+      samples.append((image_data, additional_data, priors, reward))
+  return samples
 
 class ExperienceReplay(Dataset):
   def __init__(self, samples, train=False):
@@ -44,7 +59,8 @@ def validate(model, dataloader, device):
   total_value_loss /= len(dataloader)
   return total_loss, total_priors_loss, total_value_loss
 
-def train_policy_value_network(model, samples, device):
+def train_policy_value_network(model, episodes, device):
+  samples = prepare_samples(episodes)
   split_ratio = 0.9
   split_count = int(split_ratio * len(samples))
   train_samples, val_samples = samples[:split_count], samples[split_count:]

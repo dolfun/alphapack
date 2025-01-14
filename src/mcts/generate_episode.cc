@@ -8,7 +8,7 @@
 
 class SeedPool {
 public:
-  SeedPool(uint32_t seed, size_t pool_size) : seeds(pool_size), sample_dist { 0, pool_size - 1 } {
+  SeedPool(uint32_t seed, int pool_size) : seeds(pool_size), sample_dist(0, pool_size - 1) {
     std::mt19937 engine { seed };
     std::uniform_int_distribution<uint32_t> seed_dist{};
     std::ranges::generate(seeds, [&] { return seed_dist(engine); });
@@ -92,19 +92,19 @@ auto generate_episode(
 
 auto generate_episodes(
   uint32_t seed,
-  size_t seed_pool_size,
+  int seed_pool_size,
   int episodes_count,
   int worker_count,
   int simulations_per_move,
   int mcts_thread_count,
-  size_t batch_size,
   float c_puct,
   int virtual_loss,
+  int batch_size,
   InferenceQueue::InferFunc infer_func
   ) -> std::vector<std::vector<Evaluation>> {
 
   SeedPool seed_pool { seed, seed_pool_size };
-  InferenceQueue inference_queue { batch_size, infer_func };
+  InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
 
   std::mutex episodes_mutex;
   std::vector<std::vector<Evaluation>> episodes;

@@ -1,6 +1,6 @@
 from policy_value_network import PolicyValueNetwork
 from train import train_policy_value_network
-from generate import generate_training_samples
+from generate import generate_episodes
 
 from dataclasses import dataclass
 import argparse
@@ -30,21 +30,23 @@ class Config:
   virtual_loss: int
   threshold_momentum: float
 
-def perform_iteration(config, model_path):
-  # Generate Samples
-  print('GENERATING SAMPLES:')
-  samples = generate_training_samples(config, model_path, device)
+def perform_iteration(config, model_path, generate_only):
+  # Generate Episodes
+  print('GENERATING EPISODES:')
+  episodes = generate_episodes(config, model_path, device)
   print()
 
-  with open('checkpoint/samples.bin', 'wb') as f:
+  with open('checkpoint/episodes.bin', 'wb') as f:
     import pickle
-    pickle.dump(samples, f)
+    pickle.dump(episodes, f)
+
+  if generate_only: return
 
   # Train
   print('TRAINING:')
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
-  train_policy_value_network(model, samples, device)
+  train_policy_value_network(model, episodes, device)
   torch.save(model.state_dict(), model_path)
   print()
 
@@ -52,6 +54,7 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
   parser.add_argument('--model_path', default='policy_value_network.pth')
+  parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
   config = Config(
@@ -77,7 +80,7 @@ def main():
 
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(config, args.model_path)
+    perform_iteration(config, args.model_path, args.generate_only)
 
 if __name__ == '__main__':
   main()
