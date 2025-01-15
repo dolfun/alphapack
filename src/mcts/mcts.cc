@@ -1,9 +1,17 @@
 #include "mcts.h"
 #include <cmath>
+#include <random>
+#include <ranges>
 
 namespace mcts {
 
-bool run_mcts_simulation(NodePtr node, float c_puct, int virtual_loss, InferenceQueue& inference_queue) {
+bool run_mcts_simulation(
+    NodePtr node,
+    float c_puct,
+    int virtual_loss,
+    bool is_root,
+    float alpha,
+    InferenceQueue& inference_queue) {
   // Selection
   std::vector<NodePtr> search_path { node };
   while (node->evaluated) {
@@ -68,6 +76,23 @@ bool run_mcts_simulation(NodePtr node, float c_puct, int virtual_loss, Inference
 
   for (auto child : node->children) {
     child->prior = priors[child->action_idx] / total_valid_prior;
+
+    // Dirichlet Noise
+    if (alpha > 0 && is_root) {
+      static std::random_device rd{};
+      static std::mt19937 engine { rd() };
+      std::gamma_distribution<float> dist { alpha };
+
+      size_t k = node->children.size();
+      std::vector<float> dirichlet_noise(k);
+      std::ranges::generate(dirichlet_noise, [&] { return dist(engine); });
+      for (size_t i = 0; i < k; ++i) {
+        NodePtr child = node->children[i];
+        float noise = dirichlet_noise[i];
+        constexpr float epsilon = 0.25f;
+        child->prior = (1.0f - epsilon) * child->prior + epsilon * noise;
+      }
+    }
   }
 
   // Backpropagation

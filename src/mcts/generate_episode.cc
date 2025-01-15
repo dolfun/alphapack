@@ -36,6 +36,7 @@ auto generate_episode(
   int thread_count,
   float c_puct,
   int virtual_loss,
+  float alpha,
   InferenceQueue& inference_queue
   ) -> std::vector<Evaluation> {
 
@@ -46,7 +47,14 @@ auto generate_episode(
     std::atomic<int> simulation_count;
     auto task = [&] {
       while (simulation_count < simulations_per_move) {
-        bool success = run_mcts_simulation(node, c_puct, virtual_loss, inference_queue);
+        bool success = run_mcts_simulation(
+          node,
+          c_puct,
+          virtual_loss,
+          episode.empty(),
+          alpha,
+          inference_queue
+        );
         if (success) ++simulation_count;
       }
     };
@@ -109,6 +117,7 @@ auto generate_episodes(
   int mcts_thread_count,
   float c_puct,
   int virtual_loss,
+  float alpha,
   int batch_size,
   InferenceQueue::InferFunc infer_func
   ) -> std::vector<std::vector<Evaluation>> {
@@ -137,6 +146,7 @@ auto generate_episodes(
       mcts_thread_count,
       c_puct,
       virtual_loss,
+      alpha,
       inference_queue
     );
 

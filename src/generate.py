@@ -46,9 +46,9 @@ def infer(states):
   
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
-  policy, value = model.forward(image_data, additional_data)
-  policy = torch.softmax(policy, dim=1)
-  result = (policy.cpu().numpy(), value.cpu().numpy())
+  priors, value = model.forward(image_data, additional_data)
+  priors = torch.softmax(priors, dim=1)
+  result = (priors.cpu().numpy(), value.cpu().numpy())
   return result
 
 def generate_episodes_wrapper(episodes_count):
@@ -64,6 +64,7 @@ def generate_episodes_wrapper(episodes_count):
     config.mcts_thread_count,
     config.c_puct,
     config.virtual_loss,
+    config.alpha,
     config.batch_size,
     infer
   )

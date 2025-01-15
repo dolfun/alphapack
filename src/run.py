@@ -29,6 +29,7 @@ class Config:
   batch_size: int
   c_puct: float
   virtual_loss: int
+  alpha: float
   threshold_momentum: float
 
 def perform_iteration(config, model_path, generate_only):
@@ -71,6 +72,7 @@ def main():
     batch_size=32,
     c_puct=5,
     virtual_loss=3,
+    alpha=0.108,
     threshold_momentum=0.5
   )
 

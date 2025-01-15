@@ -14,6 +14,7 @@ auto generate_episodes(
   int mcts_thread_count,
   float c_puct,
   int virtual_loss,
+  float alpha,
   int batch_size,
   InferenceQueue::InferFunc infer_func
 ) -> std::vector<std::vector<Evaluation>>;

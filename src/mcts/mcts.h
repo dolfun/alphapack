@@ -22,6 +22,13 @@ struct Node {
 };
 using NodePtr = Node::Ptr;
 
-bool run_mcts_simulation(NodePtr node, float c_puct, int virtual_loss, InferenceQueue& inference_queue);
+bool run_mcts_simulation(
+  NodePtr node,
+  float c_puct,
+  int virtual_loss,
+  bool is_root,
+  float alpha,
+  InferenceQueue& inference_queu
+);
 
 }
