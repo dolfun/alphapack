@@ -18,12 +18,14 @@ def prepare_samples(episodes):
       priors = np.array(evaluation.priors, dtype=np.float32)
       reward = np.array([evaluation.reward], dtype=np.float32)
       samples.append((image_data, additional_data, priors, reward))
+  
+  np.random.shuffle(samples)
   return samples
 
 class ExperienceReplay(Dataset):
-  def __init__(self, samples, train=False):
+  def __init__(self, samples, augment=False):
     self.samples = samples
-    if train:
+    if augment:
       self.samples = [
         augmented_sample
         for sample in self.samples
@@ -64,7 +66,7 @@ def train_policy_value_network(model, episodes, device):
   split_ratio = 0.9
   split_count = int(split_ratio * len(samples))
   train_samples, val_samples = samples[:split_count], samples[split_count:]
-  train_dataset = ExperienceReplay(train_samples, train=True)
+  train_dataset = ExperienceReplay(train_samples, augment=True)
   val_datset = ExperienceReplay(val_samples)
   train_dataloader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
   val_dataloader = DataLoader(val_datset, batch_size=2048, shuffle=True)
@@ -73,7 +75,7 @@ def train_policy_value_network(model, episodes, device):
   model.train()
   epochs = 4
   lr = 0.01
-  optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+  optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-3)
   for epoch in range(epochs):
     epoch_loss = 0.0
     epoch_priors_loss = 0.0

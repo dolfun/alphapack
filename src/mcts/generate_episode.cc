@@ -27,6 +27,24 @@ private:
   std::uniform_int_distribution<size_t> sample_dist;
 };
 
+auto generate_random_states(int count, SeedPool& seed_pool) -> std::vector<State> {
+  std::vector<State> states;
+  states.reserve(count);
+  while (count--) {
+    auto seed = seed_pool.get();
+    std::mt19937 engine { seed };
+    std::uniform_int_distribution<int> dist { 2, 5 };
+    std::vector<Item> items(State::item_count);
+    for (auto& item : items) {
+      item.shape.x = dist(engine);
+      item.shape.y = dist(engine);
+      item.shape.z = dist(engine);
+    }
+    states.emplace_back(items);
+  }
+  return states;
+}
+
 namespace mcts {
 
 auto generate_episode(
@@ -56,6 +74,7 @@ auto generate_episode(
           inference_queue
         );
         if (success) ++simulation_count;
+        else std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Measure impact
       }
     };
 
@@ -122,25 +141,16 @@ auto generate_episodes(
   InferenceQueue::InferFunc infer_func
   ) -> std::vector<std::vector<Evaluation>> {
 
-  SeedPool seed_pool { seed, seed_pool_size };
-  InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
-
   std::mutex episodes_mutex;
   std::vector<std::vector<Evaluation>> episodes;
-  auto task = [&] {
-    auto seed = seed_pool.get();
-    std::mt19937 engine { seed };
-    std::uniform_int_distribution<int> dist { 2, 5 };
-    std::vector<Item> items(State::item_count);
-    for (auto& item : items) {
-      item.shape.x = dist(engine);
-      item.shape.y = dist(engine);
-      item.shape.z = dist(engine);
-    }
 
-    State state { items };
+  SeedPool seed_pool { seed, seed_pool_size };
+  std::atomic<int> states_index;
+  auto initial_states = generate_random_states(episodes_count, seed_pool);
+  InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
+  auto task = [&] {
     auto episode = generate_episode(
-      state,
+      initial_states[states_index++],
       move_threshold,
       simulations_per_move,
       mcts_thread_count,

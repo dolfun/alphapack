@@ -28,6 +28,7 @@ def init_worker(_config, model_path, _device):
 
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
+  model = torch.jit.script(model)
   model.eval()
 
 @torch.no_grad()

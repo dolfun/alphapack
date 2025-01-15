@@ -2,6 +2,7 @@
 #include <cmath>
 #include <random>
 #include <ranges>
+#include <algorithm>
 
 namespace mcts {
 
@@ -12,6 +13,7 @@ bool run_mcts_simulation(
     bool is_root,
     float alpha,
     InferenceQueue& inference_queue) {
+
   // Selection
   std::vector<NodePtr> search_path { node };
   while (node->evaluated) {
@@ -79,16 +81,17 @@ bool run_mcts_simulation(
 
     // Dirichlet Noise
     if (alpha > 0 && is_root) {
-      static std::random_device rd{};
-      static std::mt19937 engine { rd() };
-      std::gamma_distribution<float> dist { alpha };
+      thread_local static std::random_device rd{};
+      thread_local static std::mt19937 engine { rd() };
+      thread_local static std::gamma_distribution<float> dist { alpha }; // assuming alpha doesn't change
 
       size_t k = node->children.size();
       std::vector<float> dirichlet_noise(k);
       std::ranges::generate(dirichlet_noise, [&] { return dist(engine); });
+      auto dirichlet_noise_sum = std::accumulate(dirichlet_noise.begin(), dirichlet_noise.end(), 0.0f);
       for (size_t i = 0; i < k; ++i) {
         NodePtr child = node->children[i];
-        float noise = dirichlet_noise[i];
+        float noise = dirichlet_noise[i] / dirichlet_noise_sum;
         constexpr float epsilon = 0.25f;
         child->prior = (1.0f - epsilon) * child->prior + epsilon * noise;
       }

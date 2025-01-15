@@ -48,6 +48,7 @@ def perform_iteration(config, model_path, generate_only):
   print('TRAINING:')
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
+  model = torch.jit.script(model)
   train_policy_value_network(model, episodes, device)
   torch.save(model.state_dict(), model_path)
   print()
@@ -70,16 +71,16 @@ def main():
     simulations_per_move=256,
     mcts_thread_count=8,
     batch_size=32,
-    c_puct=5,
+    c_puct=1.25,
     virtual_loss=3,
-    alpha=0.108,
-    threshold_momentum=0.5
+    alpha=0.15,
+    threshold_momentum=0.25
   )
 
   # Create model if does not exist
   if not os.path.exists(args.model_path):
     print('Creating new model!')
-    model = PolicyValueNetwork()
+    model = PolicyValueNetwork().to(device)
     torch.save(model.state_dict(), args.model_path)
 
   for i in range(args.iteration_count):
