@@ -73,7 +73,7 @@ def train_policy_value_network(model, episodes, device):
   print(f'{len(train_dataset)} samples loaded!')
 
   model.train()
-  epochs = 4
+  epochs = 6
   lr = 0.01
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-3)
   for epoch in range(epochs):

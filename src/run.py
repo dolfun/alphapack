@@ -63,7 +63,7 @@ def main():
   config = Config(
     seed=2389473453,
     seed_pool_size=2048,
-    episodes_per_iteration=512,
+    episodes_per_iteration=1024,
     processes=4,
     step_size=32,
     workers_per_process=16,
@@ -74,7 +74,7 @@ def main():
     c_puct=1.25,
     virtual_loss=3,
     alpha=0.15,
-    threshold_momentum=0.25
+    threshold_momentum=0.5
   )
 
   # Create model if does not exist

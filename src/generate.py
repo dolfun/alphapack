@@ -44,7 +44,7 @@ def infer(states):
     np.array(state.normalized_items, dtype=np.float32)
     for state in states
   ]
-  
+
   image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
   additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
   priors, value = model.forward(image_data, additional_data)
@@ -109,7 +109,7 @@ def generate_episodes(config, model_path, device):
   wins = reshaped_rewards[+1]
   losses = reshaped_rewards[-1]
   win_ratio = wins / (wins + losses)
-  print(f'{move_count} moves generated!')
+  print(f'{move_count} moves generated! ({move_count / config.episodes_per_iteration:.1f} moves per episode)')
   print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
   print(f'Threshold: {threshold:.3f}')
   print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')

@@ -86,13 +86,18 @@ class Grid {
   };
 
   applyHover(i, j, length, width, height) {
+    let maxHeight = -1;
+    this.apply(i, j, length, width, (cell) => {
+      maxHeight = Math.max(maxHeight, cell.value);
+    });
+
     this.apply(i, j, length, width, (cell) => {
       if (this.isValidPlacement(i, j, length, width, height)) {
         cell.style.backgroundColor = '#ccffcc';
       } else {
         cell.style.backgroundColor = '#ffcccc';
       }
-      cell.textContent = cell.value + height;
+      cell.textContent = maxHeight + height;
     });
   }
 
@@ -230,8 +235,16 @@ function addEventListeners(info, grid, items) {
         if (!grid.isValidPlacement(i, j, length, width, height)) return;
 
         grid.removeHover(0, 0, grid.length, grid.length);
+
+        let maxHeight = -1;
         grid.apply(i, j, length, width, (cell) => {
-          cell.value += height;
+          maxHeight = Math.max(maxHeight, cell.value);
+        });
+
+        grid.apply(i, j, length, width, (cell) => {
+          cell.value = maxHeight + height;
+          if (cell.value > grid.info.height) alert('Max height exceeded!');
+
           cell.textContent = cell.value;
           cell.style.backgroundColor = grid.getCellColor(cell);
         });

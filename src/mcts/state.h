@@ -7,10 +7,12 @@ class State {
 public:
   State(const std::vector<Item>& items)
     : m_items { items },
-      m_height_map { State::bin_length, State::bin_length } {}
+      m_height_map { State::bin_length, State::bin_length },
+      m_feasibility_info { create_feasibility_info(m_items.front()) } {}
 
   auto items() const noexcept -> const std::vector<Item>&;
   auto height_map() const noexcept -> const Array2D<int>&;
+  auto feasibility_mask() const noexcept -> const Array2D<char>;
 
   auto normalized_items() const noexcept -> const std::vector<float>;
 
@@ -18,7 +20,7 @@ public:
   void transition(int);
   float reward() const noexcept;
 
-  auto serialize() const noexcept -> std::string;
+  static std::string serialize(const State&);
   static State unserialize(const std::string&);
 
   static constexpr int bin_length = 10;
@@ -28,11 +30,14 @@ public:
   static constexpr size_t values_per_item = 4;
 
 private:
-  State(std::vector<Item>&& items, Array2D<int>&& height_map)
-    : m_items { std::move(items) }, m_height_map { std::move(height_map) } {}
+  State(std::vector<Item>&& items, Array2D<int>&& height_map, Array2D<int>&& feasibility_info)
+    : m_items { std::move(items) },
+      m_height_map { std::move(height_map) },
+      m_feasibility_info { std::move(feasibility_info) } {}
   
-  auto get_valid_state_mask(const Item&) const noexcept -> Array2D<int>;
+  auto create_feasibility_info(const Item&) const noexcept -> Array2D<int>;
 
   std::vector<Item> m_items;
   Array2D<int> m_height_map;
+  Array2D<int> m_feasibility_info;
 };

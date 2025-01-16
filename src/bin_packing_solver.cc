@@ -41,15 +41,13 @@ PYBIND11_MODULE(bin_packing_solver, m) {
 
     .def_property_readonly("items", &State::items)
     .def_property_readonly("height_map", &State::height_map)
+    .def_property_readonly("feasibility_mask", &State::feasibility_mask)
 
     .def_property_readonly("normalized_items", &State::normalized_items)
 
     .def_property_readonly("possible_actions", &State::possible_actions)
     .def("transition", &State::transition, py::arg("action_idx"))
     .def_property_readonly("reward", &State::reward)
-
-    .def("serialize", &State::serialize)
-    .def("unserialize", &State::unserialize)
 
     .def_readonly_static("bin_length", &State::bin_length)
     .def_readonly_static("bin_height", &State::bin_height)
@@ -58,8 +56,8 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly_static("values_per_item", &State::values_per_item)
 
     .def(py::pickle(
-      [] (const State& state) { return state.serialize(); }, 
-      &State::unserialize
+      [] (const State& state) { return py::bytes(State::serialize(state)); },
+      [] (const py::bytes& bytes) { return State::unserialize(bytes); }
     ));
 
   // Evaluation
