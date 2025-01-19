@@ -31,9 +31,12 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readwrite("placed", &Item::placed)
     .def_readwrite("pos", &Item::pos);
 
-  // Array2D<int>
+  // Array2D
   py::class_<Array2D<int>>(m, "Array2Di", py::buffer_protocol())
     .def_buffer(array_2d_buffer_info<int>);
+
+  py::class_<Array2D<char>>(m, "Array2Db", py::buffer_protocol())
+    .def_buffer(array_2d_buffer_info<char>);
   
   // State
   py::class_<State, std::shared_ptr<State>>(m, "State")
@@ -42,18 +45,19 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_property_readonly("items", &State::items)
     .def_property_readonly("height_map", &State::height_map)
     .def_property_readonly("feasibility_mask", &State::feasibility_mask)
-
     .def_property_readonly("normalized_items", &State::normalized_items)
+    .def_property_readonly("packing_efficiency", &State::packing_efficiency)
 
     .def_property_readonly("possible_actions", &State::possible_actions)
     .def("transition", &State::transition, py::arg("action_idx"))
-    .def_property_readonly("reward", &State::reward)
 
     .def_readonly_static("bin_length", &State::bin_length)
     .def_readonly_static("bin_height", &State::bin_height)
     .def_readonly_static("action_count", &State::action_count)
     .def_readonly_static("item_count", &State::item_count)
     .def_readonly_static("values_per_item", &State::values_per_item)
+    .def_readonly_static("min_item_dim", &State::min_item_dim)
+    .def_readonly_static("max_item_dim", &State::max_item_dim)
 
     .def(py::pickle(
       [] (const State& state) { return py::bytes(State::serialize(state)); },

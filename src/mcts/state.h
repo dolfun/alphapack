@@ -13,12 +13,11 @@ public:
   auto items() const noexcept -> const std::vector<Item>&;
   auto height_map() const noexcept -> const Array2D<int>&;
   auto feasibility_mask() const noexcept -> const Array2D<char>;
-
   auto normalized_items() const noexcept -> const std::vector<float>;
+  float packing_efficiency() const noexcept;
 
   auto possible_actions() const -> std::vector<int>;
-  void transition(int);
-  float reward() const noexcept;
+  [[nodiscard]] float transition(int);
 
   static std::string serialize(const State&);
   static State unserialize(const std::string&);
@@ -28,6 +27,8 @@ public:
   static constexpr size_t action_count = bin_length * bin_length;
   static constexpr size_t item_count = 32;
   static constexpr size_t values_per_item = 4;
+  static constexpr int min_item_dim = 2;
+  static constexpr int max_item_dim = 5;
 
 private:
   State(std::vector<Item>&& items, Array2D<int>&& height_map, Array2D<int>&& feasibility_info)

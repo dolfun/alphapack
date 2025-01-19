@@ -71,21 +71,40 @@ auto State::feasibility_mask() const noexcept -> const Array2D<char> {
 }
 
 auto State::normalized_items() const noexcept -> const std::vector<float> {
+  auto normalize_dim = [] (int val) {
+    return (static_cast<float>(val) - min_item_dim) / (max_item_dim - min_item_dim);
+  };
+
+  auto normalize_vol = [] (int val) {
+    constexpr float min_item_volume = (min_item_dim * min_item_dim * min_item_dim);
+    constexpr float max_item_volume = (max_item_dim * max_item_dim * max_item_dim);
+    return (static_cast<float>(val) - min_item_volume) / (max_item_volume - min_item_volume);
+  };
+
   std::vector<float> data(item_count * values_per_item);
   auto it = data.begin();
   for (const auto& item : m_items) {
     if (!item.placed) {
-      float x = static_cast<float>(item.shape.x) / State::bin_length;
-      float y = static_cast<float>(item.shape.y) / State::bin_length;
-      float z = static_cast<float>(item.shape.z) / State::bin_height;
-      it[0] = x;
-      it[1] = y;
-      it[2] = z;
-      it[3] = x * y * z;
+      it[0] = normalize_dim(item.shape.x);
+      it[1] = normalize_dim(item.shape.y);
+      it[2] = normalize_dim(item.shape.z);
+      it[3] = normalize_vol(item.shape.x * item.shape.y * item.shape.z);
     }
     it += 4;
   }
   return data;
+}
+
+float State::packing_efficiency() const noexcept {
+  int total_volume = 0;
+  for (const auto& item : m_items) {
+    if (item.placed) {
+      total_volume += item.shape.x * item.shape.y * item.shape.z;
+    }
+  }
+
+  constexpr int bin_volume = (bin_length * bin_length * bin_height);
+  return static_cast<float>(total_volume) / bin_volume;
 }
 
 auto State::possible_actions() const -> std::vector<int> {
@@ -100,12 +119,12 @@ auto State::possible_actions() const -> std::vector<int> {
   return actions;
 }
 
-void State::transition(int action_idx) {
-  Item current_item = m_items.front();
-  current_item.placed = true;
+float State::transition(int action_idx) {
   std::rotate(m_items.begin(), m_items.begin() + 1, m_items.end());
+  Item& current_item = m_items.back();
+  current_item.placed = true;
 
-  int x0 = action_idx / State::bin_length, y0 = action_idx % State::bin_length;
+  int x0 = action_idx / bin_length, y0 = action_idx % bin_length;
   for (int x = x0; x < x0 + current_item.shape.x; ++x) {
     for (int y = y0; y < y0 + current_item.shape.y; ++y) {
       m_height_map(x, y) = m_feasibility_info(x0, y0) + current_item.shape.z;
@@ -113,22 +132,17 @@ void State::transition(int action_idx) {
   }
 
   m_feasibility_info = create_feasibility_info(m_items.front());
-}
 
-float State::reward() const noexcept {
-  float total_volume = 0.0f;
-  for (auto item : m_items) {
-    if (item.placed) total_volume += item.shape.x * item.shape.y * item.shape.z;
-  }
-  float packing_efficiency = total_volume / (State::bin_length * State::bin_length * State::bin_height);
-  return packing_efficiency;
+  float reward = current_item.shape.x * current_item.shape.y * current_item.shape.z;
+  reward /= (bin_length * bin_length * bin_height);
+  return reward;
 }
 
 auto State::serialize(const State& state) -> std::string {
   std::pair<const void*, size_t> infos[3] = {
-    { state.m_items.data(), sizeof(Item) * State::item_count },
-    { state.m_height_map.data(), sizeof(int) * State::bin_length * State::bin_length },
-    { state.m_feasibility_info.data(), sizeof(int) * State::bin_length * State::bin_length }
+    { state.m_items.data(), sizeof(Item) * item_count },
+    { state.m_height_map.data(), sizeof(int) * bin_length * bin_length },
+    { state.m_feasibility_info.data(), sizeof(int) * bin_length * bin_length }
   };
 
   size_t total_size = 0;
@@ -147,13 +161,13 @@ auto State::serialize(const State& state) -> std::string {
 
 State State::unserialize(const std::string& bytes) {
   std::vector<Item> items(item_count);
-  Array2D<int> height_map(State::bin_length, State::bin_length);
-  Array2D<int> feasibility_info(State::bin_length, State::bin_length);
+  Array2D<int> height_map(bin_length, bin_length);
+  Array2D<int> feasibility_info(bin_length, bin_length);
 
   std::pair<void*, size_t> infos[3] = {
     { items.data(), sizeof(Item) * item_count },
-    { height_map.data(), sizeof(int) * State::bin_length * State::bin_length },
-    { feasibility_info.data(), sizeof(int) * State::bin_length * State::bin_length }
+    { height_map.data(), sizeof(int) * bin_length * bin_length },
+    { feasibility_info.data(), sizeof(int) * bin_length * bin_length }
   };
 
   const char* src = &bytes[0];
@@ -166,14 +180,14 @@ State State::unserialize(const std::string& bytes) {
 }
 
 auto State::create_feasibility_info(const Item& item) const noexcept -> Array2D<int> {
-  Array2D<int> info { State::bin_length, State::bin_length, -1 };
+  Array2D<int> info { bin_length, bin_length, -1 };
   if (item.placed) return info;
 
   auto max_height_freq = get_max_freq_in_window(m_height_map, item.shape);
   for (std::size_t x = 0; x <= info.rows() - item.shape.x; ++x) {
     for (std::size_t y = 0; y <= info.cols() - item.shape.y; ++y) {
       auto [max_height, _] = max_height_freq(x, y);
-      if (max_height + item.shape.z > State::bin_height) continue;
+      if (max_height + item.shape.z > bin_height) continue;
       info(x, y) = max_height;
     }
   }

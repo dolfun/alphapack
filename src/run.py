@@ -3,7 +3,9 @@ from train import train_policy_value_network
 from generate import generate_episodes
 
 from dataclasses import dataclass
+from copy import copy
 import argparse
+import pickle
 import torch
 import os
 
@@ -30,17 +32,15 @@ class Config:
   c_puct: float
   virtual_loss: int
   alpha: float
-  threshold_momentum: float
 
-def perform_iteration(config, model_path, generate_only):
+def perform_iteration(config: Config, model_path: str, generate_only: bool):
   # Generate Episodes
   print('GENERATING EPISODES:')
   episodes = generate_episodes(config, model_path, device)
-  print()
-
-  with open('checkpoint/episodes.bin', 'wb') as f:
-    import pickle
+  with open('episodes_train.bin', 'wb') as f:
     pickle.dump(episodes, f)
+
+  print()
 
   if generate_only: return
 
@@ -53,6 +53,21 @@ def perform_iteration(config, model_path, generate_only):
   torch.save(model.state_dict(), model_path)
   print()
 
+  # Evaluation
+  print('EVALUATING:')
+  eval_config = copy(config)
+  eval_config.episodes_per_iteration = 256
+  eval_config.step_size = 16
+  eval_config.move_threshold = 0
+  eval_config.simulations_per_move = 1200
+  eval_config.alpha = 0
+
+  episodes = generate_episodes(eval_config, model_path, device, leave_progress_bar=False)
+  with open('episodes_test.bin', 'wb') as f:
+    pickle.dump(episodes, f)
+
+  print()
+
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
@@ -63,18 +78,17 @@ def main():
   config = Config(
     seed=2389473453,
     seed_pool_size=2048,
-    episodes_per_iteration=1024,
+    episodes_per_iteration=2048,
     processes=4,
-    step_size=32,
+    step_size=64,
     workers_per_process=16,
     move_threshold=4,
-    simulations_per_move=256,
+    simulations_per_move=800,
     mcts_thread_count=8,
     batch_size=32,
-    c_puct=1.25,
+    c_puct=2.5,
     virtual_loss=3,
-    alpha=0.15,
-    threshold_momentum=0.5
+    alpha=0.1
   )
 
   # Create model if does not exist

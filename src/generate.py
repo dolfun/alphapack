@@ -36,7 +36,10 @@ def infer(states):
   global model, device
 
   image_data = [
-    np.array(np.expand_dims(state.height_map, axis=0), dtype=np.float32) / State.bin_height
+    np.stack([
+      np.array(state.height_map, dtype=np.float32) / State.bin_height,
+      np.array(state.feasibility_mask, dtype=np.float32)
+    ])
     for state in states
   ]
 
@@ -45,8 +48,8 @@ def infer(states):
     for state in states
   ]
 
-  image_data = torch.tensor(np.stack(image_data, axis=0), device=device)
-  additional_data = torch.tensor(np.stack(additional_data, axis=0), device=device)
+  image_data = torch.tensor(np.stack(image_data), device=device)
+  additional_data = torch.tensor(np.stack(additional_data), device=device)
   priors, value = model.forward(image_data, additional_data)
   priors = torch.softmax(priors, dim=1)
   result = (priors.cpu().numpy(), value.cpu().numpy())
@@ -72,46 +75,25 @@ def generate_episodes_wrapper(episodes_count):
 
   return episodes
 
-threshold = None
-def generate_episodes(config, model_path, device):
+def generate_episodes(config, model_path, device, leave_progress_bar=True):
   file = tempfile.TemporaryFile()
   initargs = (config, model_path, device)
   with mp.Pool(config.processes, initializer=init_worker, initargs=initargs) as pool:
     steps_count = (config.episodes_per_iteration + config.step_size - 1) // config.step_size
     args = [config.step_size for _ in range(steps_count)]
     it = pool.imap_unordered(generate_episodes_wrapper, args)
-    for episodes in tqdm(it, total=steps_count):
+    for episodes in tqdm(it, total=steps_count, leave=leave_progress_bar):
       for episode in episodes:
         pickle.dump(episode, file)
 
   episodes = load_episodes(file)
-  rewards = np.array([episode[0].reward for episode in episodes])
-  mean_reward = rewards.mean()
-
-  global threshold
-  if threshold is None:
-    threshold = mean_reward
-  if mean_reward > threshold:
-    momentum = config.threshold_momentum
-    threshold = (1 - momentum) * threshold + momentum * mean_reward
+  packing_efficiency = np.array([episode[-1].state.packing_efficiency for episode in episodes])
 
   move_count = 0
-  reshaped_rewards = { +1:0, -1:0 }
   for episode in episodes:
-    reward = episode[0].reward
-    reshaped_reward = +1 if reward > threshold else -1
-    reshaped_rewards[reshaped_reward] += 1
-
     move_count += len(episode)
-    for evaluation in episode:
-      evaluation.reward = reshaped_reward
 
-  wins = reshaped_rewards[+1]
-  losses = reshaped_rewards[-1]
-  win_ratio = wins / (wins + losses)
   print(f'{move_count} moves generated! ({move_count / config.episodes_per_iteration:.1f} moves per episode)')
-  print(f'Average reward: {rewards.mean():.2f} ± {rewards.std():.3f}')
-  print(f'Threshold: {threshold:.3f}')
-  print(f'Reshaped reward: {wins} wins, {losses} losses ({win_ratio * 100:.1f}%)')
+  print(f'Average packing efficiency: {packing_efficiency.mean():.2f} ± {packing_efficiency.std():.3f}')
 
   return episodes

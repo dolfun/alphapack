@@ -54,7 +54,7 @@ bool run_mcts_simulation(
   if (node->state == nullptr) {
     auto prev_node = node->prev_node.lock();
     node->state = std::make_shared<State>(*prev_node->state);
-    node->state->transition(node->action_idx);
+    node->reward = node->state->transition(node->action_idx);
   }
 
   // Enqueue for async evaluation
@@ -98,10 +98,12 @@ bool run_mcts_simulation(
     }
   }
 
-  // Backpropagation
-  for (auto node : search_path) {
+  // Backup
+  float cummulative_reward = value;
+  for (auto node : std::views::reverse(search_path)) {
     node->visit_count += 1 - virtual_loss;
-    node->total_action_value += value + virtual_loss;
+    node->total_action_value += cummulative_reward + virtual_loss;
+    cummulative_reward += node->reward;
   }
   node->evaluated = true;
 

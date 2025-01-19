@@ -33,7 +33,7 @@ auto generate_random_states(int count, SeedPool& seed_pool) -> std::vector<State
   while (count--) {
     auto seed = seed_pool.get();
     std::mt19937 engine { seed };
-    std::uniform_int_distribution<int> dist { 2, 5 };
+    std::uniform_int_distribution<int> dist { State::min_item_dim, State::max_item_dim };
     std::vector<Item> items(State::item_count);
     for (auto& item : items) {
       item.shape.x = dist(engine);
@@ -60,7 +60,7 @@ auto generate_episode(
 
   std::vector<Evaluation> episode;
   auto node = std::make_shared<Node>();
-  node->state = std::make_unique<State>(state);
+  node->state = std::make_shared<State>(state);
   while (true) {
     std::atomic<int> simulation_count;
     auto task = [&] {
@@ -106,21 +106,25 @@ auto generate_episode(
       }
     }
 
-    static std::random_device rd{};
-    static std::mt19937 engine { rd() };
+    thread_local static std::random_device rd{};
+    thread_local static std::mt19937 engine { rd() };
     std::discrete_distribution<size_t> dist(weights.begin(), weights.end());
     NodePtr next_node = node->children[dist(engine)];
-    int action_idx = next_node->action_idx;
+    if (next_node->state == nullptr) {
+      next_node->state = std::make_shared<State>(*node->state);
+      next_node->reward = next_node->state->transition(next_node->action_idx);
+    }
 
-    episode.emplace_back(*node->state, action_idx, priors);
-    next_node->state = std::make_unique<State>(*node->state);
-    next_node->state->transition(action_idx);
+    episode.emplace_back(*node->state, next_node->action_idx, priors, next_node->reward);
     node = next_node;
   }
 
-  auto reward = node->state->reward();
-  for (auto& evaluation : episode) {
-    evaluation.reward = reward;
+  episode.emplace_back(*node->state, -1, std::vector<float>(State::action_count), 0.0f);
+
+  float cumulative_reward = 0.0f;
+  for (auto& evaluation : std::views::reverse(episode)) {
+    cumulative_reward += evaluation.reward;
+    evaluation.reward = cumulative_reward;
   }
 
   return episode;

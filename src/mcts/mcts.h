@@ -15,6 +15,7 @@ struct Node {
   std::atomic<int> action_idx = -1;
   std::atomic<int> visit_count;
   std::atomic<float> total_action_value;
+  std::atomic<float> reward;
   std::atomic<float> prior;
 
   using Ptr = std::shared_ptr<Node>;
