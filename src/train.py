@@ -78,11 +78,11 @@ def train_policy_value_network(model, episodes, device):
   train_samples, val_samples = samples[:split_count], samples[split_count:]
   train_dataset = ExperienceReplay(train_samples, augment=True)
   val_datset = ExperienceReplay(val_samples, augment=True) # Should I do that?
-  train_dataloader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
-  val_dataloader = DataLoader(val_datset, batch_size=2048)
+  train_dataloader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
+  val_dataloader = DataLoader(val_datset, batch_size=1024)
   print(f'{len(train_dataset)} samples loaded!')
 
-  epochs = 6
+  epochs = 4
   lr = 0.1
   loss_scale_factor = 1.5
 

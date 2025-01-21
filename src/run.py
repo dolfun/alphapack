@@ -34,8 +34,8 @@ class Config:
   alpha: float
 
 def perform_iteration(config: Config, model_path: str, generate_only: bool):
-  # Generate Episodes
-  print('GENERATING EPISODES:')
+  # Simulate Games
+  print('SIMULATING GAMES:')
   episodes = generate_episodes(config, model_path, device)
   with open('episodes_train.bin', 'wb') as f:
     pickle.dump(episodes, f)
@@ -48,7 +48,6 @@ def perform_iteration(config: Config, model_path: str, generate_only: bool):
   print('TRAINING:')
   model = PolicyValueNetwork().to(device)
   model.load_state_dict(torch.load(model_path, weights_only=False))
-  model = torch.jit.script(model)
   train_policy_value_network(model, episodes, device)
   torch.save(model.state_dict(), model_path)
   print()
@@ -57,9 +56,7 @@ def perform_iteration(config: Config, model_path: str, generate_only: bool):
   print('EVALUATING:')
   eval_config = copy(config)
   eval_config.episodes_per_iteration = 256
-  eval_config.step_size = 16
   eval_config.move_threshold = 0
-  eval_config.simulations_per_move = 1200
   eval_config.alpha = 0
 
   episodes = generate_episodes(eval_config, model_path, device, leave_progress_bar=False)
@@ -80,8 +77,8 @@ def main():
     seed_pool_size=2048,
     episodes_per_iteration=2048,
     processes=4,
-    step_size=64,
-    workers_per_process=16,
+    step_size=32,
+    workers_per_process=24,
     move_threshold=4,
     simulations_per_move=800,
     mcts_thread_count=8,

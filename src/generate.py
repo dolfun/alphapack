@@ -4,9 +4,9 @@ import bin_packing_solver
 
 import torch.multiprocessing as mp
 from tqdm import tqdm
+import numpy as np
 import tempfile
 import pickle
-import numpy as np
 import torch
 
 def load_episodes(file):
@@ -88,12 +88,9 @@ def generate_episodes(config, model_path, device, leave_progress_bar=True):
 
   episodes = load_episodes(file)
   packing_efficiency = np.array([episode[-1].state.packing_efficiency for episode in episodes])
-
-  move_count = 0
-  for episode in episodes:
-    move_count += len(episode)
-
-  print(f'{move_count} moves generated! ({move_count / config.episodes_per_iteration:.1f} moves per episode)')
   print(f'Average packing efficiency: {packing_efficiency.mean():.2f} ± {packing_efficiency.std():.3f}')
+
+  move_count = np.array([len(episode) for episode in episodes])
+  print(f'{move_count.sum()} moves played! ({move_count.mean():.1f} ± {move_count.std():.1f} moves per game)')
 
   return episodes

@@ -23,7 +23,7 @@ class ResidualBlock(nn.Module):
     return out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, nr_residual_blocks=9):
+  def __init__(self, nr_residual_blocks=10):
     super(PolicyValueNetwork, self).__init__()
     base_size = State.bin_length
     in_channels = 2
@@ -40,30 +40,32 @@ class PolicyValueNetwork(nn.Module):
       ResidualBlock(nr_channels) for _ in range(nr_residual_blocks)
     ])
 
-    conv_final_nr_channels = 2
+    conv_final_nr_channels = 16
     self.conv_final = nn.Sequential(
       nn.Conv2d(nr_channels, conv_final_nr_channels, kernel_size=3, stride=1, padding=1),
       nn.BatchNorm2d(conv_final_nr_channels),
       nn.ReLU()
     )
 
-    fc_additional_output_size = 128
+    fc_additional_output_size = 256
     self.fc_additional = nn.Sequential(
-      nn.Linear(additional_input_size, 128),
+      nn.Linear(additional_input_size, 256),
       nn.ReLU(),
-      nn.Linear(128, 128),
+      nn.Linear(256, 256),
       nn.ReLU(),
-      nn.Linear(128, fc_additional_output_size),
+      nn.Linear(256, fc_additional_output_size),
       nn.ReLU()
     )
 
     base_area = base_size * base_size
     fc_fusion_input_size = conv_final_nr_channels * base_area + fc_additional_output_size
-    fc_fusion_output_size = 256
+    fc_fusion_output_size = 512
     self.fc_fusion = nn.Sequential(
-      nn.Linear(fc_fusion_input_size, 384),
+      nn.Linear(fc_fusion_input_size, 512),
       nn.ReLU(),
-      nn.Linear(384, fc_fusion_output_size),
+      nn.Linear(512, 512),
+      nn.ReLU(),
+      nn.Linear(512, fc_fusion_output_size),
       nn.ReLU()
     )
 
