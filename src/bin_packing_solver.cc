@@ -28,15 +28,11 @@ PYBIND11_MODULE(bin_packing_solver, m) {
   py::class_<Item>(m, "Item")
     .def(py::init<>())
     .def_readwrite("shape", &Item::shape)
-    .def_readwrite("placed", &Item::placed)
-    .def_readwrite("pos", &Item::pos);
+    .def_readwrite("placed", &Item::placed);
 
   // Array2D
-  py::class_<Array2D<int>>(m, "Array2Di", py::buffer_protocol())
-    .def_buffer(array_2d_buffer_info<int>);
-
-  py::class_<Array2D<char>>(m, "Array2Db", py::buffer_protocol())
-    .def_buffer(array_2d_buffer_info<char>);
+  py::class_<Array2D<int8_t>>(m, "Array2Di", py::buffer_protocol())
+    .def_buffer(array_2d_buffer_info<int8_t>);
   
   // State
   py::class_<State, std::shared_ptr<State>>(m, "State")

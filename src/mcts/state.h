@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <cstdint>
 #include "item.h"
 #include "array2d.h"
 
@@ -11,9 +12,9 @@ public:
       m_feasibility_info { create_feasibility_info(m_items.front()) } {}
 
   auto items() const noexcept -> const std::vector<Item>&;
-  auto height_map() const noexcept -> const Array2D<int>&;
-  auto feasibility_mask() const noexcept -> const Array2D<char>;
-  auto normalized_items() const noexcept -> const std::vector<float>;
+  auto height_map() const noexcept -> const Array2D<int8_t>&;
+  auto feasibility_mask() const noexcept -> Array2D<int8_t>;
+  auto normalized_items() const noexcept -> std::vector<float>;
   float packing_efficiency() const noexcept;
 
   auto possible_actions() const -> std::vector<int>;
@@ -31,14 +32,19 @@ public:
   static constexpr int max_item_dim = 5;
 
 private:
-  State(std::vector<Item>&& items, Array2D<int>&& height_map, Array2D<int>&& feasibility_info)
+  State(std::vector<Item>&& items, Array2D<int8_t>&& height_map, Array2D<int8_t>&& feasibility_info)
     : m_items { std::move(items) },
       m_height_map { std::move(height_map) },
       m_feasibility_info { std::move(feasibility_info) } {}
-  
-  auto create_feasibility_info(const Item&) const noexcept -> Array2D<int>;
+
+  friend auto get_state_symmetry(const State&, int) noexcept -> State;
+
+  auto create_feasibility_info(const Item&) const noexcept -> Array2D<int8_t>;
 
   std::vector<Item> m_items;
-  Array2D<int> m_height_map;
-  Array2D<int> m_feasibility_info;
+  Array2D<int8_t> m_height_map;
+  Array2D<int8_t> m_feasibility_info;
 };
+
+auto get_state_symmetry(const State&, int) noexcept -> State;
+auto get_inverse_priors_symmetry(const State&, const std::vector<float>&, int) noexcept -> std::vector<float>;

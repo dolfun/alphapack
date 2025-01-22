@@ -5,6 +5,6 @@ struct Vec3i {
 };
 
 struct Item {
-  Vec3i shape, pos;
+  Vec3i shape;
   bool placed;
 };

@@ -9,14 +9,15 @@ namespace mcts {
 
 struct Node {
   std::shared_ptr<State> state;
+
+  int action_idx{-1};
+  float prior{};
   std::weak_ptr<Node> prev_node;
-  
-  std::atomic<bool> visited, evaluated;
-  std::atomic<int> action_idx = -1;
-  std::atomic<int> visit_count;
-  std::atomic<float> total_action_value;
-  std::atomic<float> reward;
-  std::atomic<float> prior;
+
+  std::atomic<bool> visited{}, evaluated{};
+  std::atomic<int> visit_count{};
+  std::atomic<float> total_action_value{};
+  std::atomic<float> reward{};
 
   using Ptr = std::shared_ptr<Node>;
   std::vector<Ptr> children;
@@ -24,12 +25,11 @@ struct Node {
 using NodePtr = Node::Ptr;
 
 bool run_mcts_simulation(
-  NodePtr node,
+  NodePtr root,
   float c_puct,
   int virtual_loss,
-  bool is_root,
   float alpha,
-  InferenceQueue& inference_queu
+  InferenceQueue& inference_queue
 );
 
 }

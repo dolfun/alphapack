@@ -30,7 +30,7 @@ private:
 auto generate_random_states(int count, SeedPool& seed_pool) -> std::vector<State> {
   std::vector<State> states;
   states.reserve(count);
-  while (count--) {
+  for (int i = 0; i < count; ++i) {
     auto seed = seed_pool.get();
     std::mt19937 engine { seed };
     std::uniform_int_distribution<int> dist { State::min_item_dim, State::max_item_dim };
@@ -62,25 +62,35 @@ auto generate_episode(
   auto node = std::make_shared<Node>();
   node->state = std::make_shared<State>(state);
   while (true) {
-    std::atomic<int> simulation_count;
+    // Inject Dirichlet Noise in root node once
+    if (alpha > 0.0f) {
+      run_mcts_simulation(
+        node,
+        c_puct,
+        virtual_loss,
+        alpha,
+        inference_queue
+      );
+    }
+
+    std::atomic<int> simulation_count{};
     auto task = [&] {
       while (simulation_count < simulations_per_move) {
         bool success = run_mcts_simulation(
           node,
           c_puct,
           virtual_loss,
-          episode.empty(),
-          alpha,
+          -1.0f,
           inference_queue
         );
         if (success) ++simulation_count;
-        else std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Measure impact
+        else std::this_thread::sleep_for(std::chrono::microseconds(100)); // !?
       }
     };
 
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
-    for (auto _ : std::views::iota(0, thread_count)) {
+    for (int i = 0; i < thread_count; ++i) {
       threads.emplace_back(task);
     }
 
@@ -149,12 +159,12 @@ auto generate_episodes(
   std::vector<std::vector<Evaluation>> episodes;
 
   SeedPool seed_pool { seed, seed_pool_size };
-  std::atomic<int> states_index;
+  std::atomic<int> states_index{};
   auto initial_states = generate_random_states(episodes_count, seed_pool);
   InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
   auto task = [&] {
     auto episode = generate_episode(
-      initial_states[states_index++],
+      initial_states[states_index.fetch_add(1)],
       move_threshold,
       simulations_per_move,
       mcts_thread_count,
@@ -168,7 +178,7 @@ auto generate_episodes(
     episodes.emplace_back(std::move(episode));
   };
 
-  std::atomic<int> work_done, threads_finished;
+  std::atomic<int> work_done{}, threads_finished{};
   std::latch latch { worker_count + 1 };
   auto worker = [&] {
     latch.arrive_and_wait();
@@ -186,7 +196,8 @@ auto generate_episodes(
   };
 
   std::vector<std::thread> threads;
-  for (auto _ : std::views::iota(0, worker_count)) {
+  threads.reserve(worker_count);
+  for (int i = 0; i < worker_count; ++i) {
     threads.emplace_back(worker);
   }
 

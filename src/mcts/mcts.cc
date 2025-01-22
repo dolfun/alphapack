@@ -7,105 +7,117 @@
 namespace mcts {
 
 bool run_mcts_simulation(
-    NodePtr node,
+    NodePtr root,
     float c_puct,
     int virtual_loss,
-    bool is_root,
     float alpha,
     InferenceQueue& inference_queue) {
 
   // Selection
-  std::vector<NodePtr> search_path { node };
-  while (node->evaluated) {
-    if (node->children.empty()) return true;
+  std::vector<NodePtr> search_path { root };
+  while (true) {
+    auto current_node = search_path.back();
+    if (!current_node->evaluated.load(std::memory_order_acquire)) break;
 
-    int total_visit_count = node->visit_count - 1;
-    auto calculate_score = [c_puct, total_visit_count] (NodePtr node) {
-      float mean_action_value = (node->visit_count > 0 ? node->total_action_value / node->visit_count : 0);
-      float puct_score = c_puct * node->prior * sqrt(total_visit_count) / (1 + node->visit_count);
+    // Terminal State Condition
+    if (current_node->children.empty()) {
+      float cumulative_reward = 0.0f;
+      for (auto node : std::views::reverse(search_path)) {
+        node->visit_count.fetch_add(1, std::memory_order_relaxed);
+        node->total_action_value.fetch_add(cumulative_reward, std::memory_order_relaxed);
+        cumulative_reward += node->reward;
+      }
+      return true;
+    }
+
+    int total_visit_count = current_node->visit_count.load(std::memory_order_relaxed) - 1;
+    float sqrt_total_visit = std::sqrt(std::max(0, total_visit_count));
+    auto calculate_score = [c_puct, sqrt_total_visit] (NodePtr node) {
+      int visit_count = node->visit_count.load(std::memory_order_relaxed);
+      float total_action_value = node->total_action_value.load(std::memory_order_relaxed);
+
+      float mean_action_value = (visit_count > 0 ? total_action_value / visit_count : 0);
+      float puct_score = c_puct * node->prior * sqrt_total_visit / (1 + visit_count);
       float score = mean_action_value + puct_score;
       return score;
     };
 
-    float max_score = -std::numeric_limits<float>::infinity();
-    NodePtr next_node;
-    for (auto child : node->children) {
-      float score = calculate_score(child);
-      if (score > max_score) {
-        max_score = score;
-        next_node = child;
-      }
-    }
-
-    node = next_node;
-    search_path.push_back(node);
+    NodePtr next_node = *std::ranges::max_element(current_node->children, {}, calculate_score);
+    search_path.push_back(next_node);
   }
 
-  auto old_visited_value = node->visited.exchange(true);
+  auto leaf_node = search_path.back();
+  auto old_visited_value = leaf_node->visited.exchange(true, std::memory_order_seq_cst);
   if (old_visited_value) return false;
   
   // Apply virtual loss
   for (auto node : search_path) {
-    node->visit_count += virtual_loss;
-    node->total_action_value -= virtual_loss;
+    node->visit_count.fetch_add(virtual_loss, std::memory_order_relaxed);
+    node->total_action_value.fetch_sub(virtual_loss, std::memory_order_relaxed);
   }
 
   // Lazy State Update
-  if (node->state == nullptr) {
-    auto prev_node = node->prev_node.lock();
-    node->state = std::make_shared<State>(*prev_node->state);
-    node->reward = node->state->transition(node->action_idx);
+  if (leaf_node->state == nullptr) {
+    auto leaf_parent_node = leaf_node->prev_node.lock();
+    leaf_node->state = std::make_shared<State>(*leaf_parent_node->state);
+    leaf_node->reward = leaf_node->state->transition(leaf_node->action_idx);
   }
 
   // Enqueue for async evaluation
-  auto evaluator_result = inference_queue.infer(node->state);
+  thread_local static std::random_device rd{};
+  thread_local static std::mt19937 engine { rd() };
+  thread_local static std::uniform_int_distribution<int> symmetry_dist(0, 7);
+
+  int symmetry_idx = symmetry_dist(engine);
+  auto transformed_state = get_state_symmetry(*leaf_node->state, symmetry_idx);
+  auto evaluator_result = inference_queue.infer(std::make_shared<State>(std::move(transformed_state)));
 
   // Expansion
-  auto actions = node->state->possible_actions();
+  auto actions = leaf_node->state->possible_actions();
+  leaf_node->children.reserve(actions.size());
   for (auto action_idx : actions) {
     auto child = std::make_shared<Node>();
-    child->prev_node = node;
+    child->prev_node = leaf_node;
     child->action_idx = action_idx;
-    node->children.push_back(child);
+    leaf_node->children.push_back(child);
   }
 
   // Priors update
   auto [priors, value] = evaluator_result.get();
+  priors = get_inverse_priors_symmetry(*leaf_node->state, priors, symmetry_idx);
+
   float total_valid_prior = 0.0f;
   for (auto action_idx : actions) {
     total_valid_prior += priors[action_idx];
   }
 
-  for (auto child : node->children) {
+  for (auto child : leaf_node->children) {
     child->prior = priors[child->action_idx] / total_valid_prior;
+  }
 
-    // Dirichlet Noise
-    if (alpha > 0 && is_root) {
-      thread_local static std::random_device rd{};
-      thread_local static std::mt19937 engine { rd() };
-      thread_local static std::gamma_distribution<float> dist { alpha }; // assuming alpha doesn't change
+  // Dirichlet Noise
+  if (alpha > 0.0f && !leaf_node->children.empty() && leaf_node == root) {
+    std::gamma_distribution<float> dist { alpha };
+    std::vector<float> dirichlet_noise(leaf_node->children.size());
+    std::ranges::generate(dirichlet_noise, [&] { return dist(engine); });
+    auto dirichlet_noise_sum = std::accumulate(dirichlet_noise.begin(), dirichlet_noise.end(), 0.0f);
 
-      size_t k = node->children.size();
-      std::vector<float> dirichlet_noise(k);
-      std::ranges::generate(dirichlet_noise, [&] { return dist(engine); });
-      auto dirichlet_noise_sum = std::accumulate(dirichlet_noise.begin(), dirichlet_noise.end(), 0.0f);
-      for (size_t i = 0; i < k; ++i) {
-        NodePtr child = node->children[i];
-        float noise = dirichlet_noise[i] / dirichlet_noise_sum;
-        constexpr float epsilon = 0.25f;
-        child->prior = (1.0f - epsilon) * child->prior + epsilon * noise;
-      }
+    for (size_t i = 0; i < leaf_node->children.size(); ++i) {
+      NodePtr child = leaf_node->children[i];
+      float noise = dirichlet_noise[i] / dirichlet_noise_sum;
+      constexpr float epsilon = 0.25f;
+      child->prior = (1.0f - epsilon) * child->prior + epsilon * noise;
     }
   }
 
   // Backup
-  float cummulative_reward = value;
+  float cumulative_reward = value;
   for (auto node : std::views::reverse(search_path)) {
-    node->visit_count += 1 - virtual_loss;
-    node->total_action_value += cummulative_reward + virtual_loss;
-    cummulative_reward += node->reward;
+    node->visit_count.fetch_add(1 - virtual_loss, std::memory_order_relaxed);
+    node->total_action_value.fetch_add(cumulative_reward + virtual_loss, std::memory_order_relaxed);
+    cumulative_reward += node->reward;
   }
-  node->evaluated = true;
+  leaf_node->evaluated.store(true, std::memory_order_release);
 
   return true;
 }

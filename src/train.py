@@ -73,11 +73,11 @@ def train_policy_value_network(model, episodes, device):
   samples = prepare_samples(episodes)
   np.random.shuffle(samples)
 
-  split_ratio = 0.95
+  split_ratio = 0.90
   split_count = int(split_ratio * len(samples))
   train_samples, val_samples = samples[:split_count], samples[split_count:]
   train_dataset = ExperienceReplay(train_samples, augment=True)
-  val_datset = ExperienceReplay(val_samples, augment=True) # Should I do that?
+  val_datset = ExperienceReplay(val_samples)
   train_dataloader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
   val_dataloader = DataLoader(val_datset, batch_size=1024)
   print(f'{len(train_dataset)} samples loaded!')
@@ -110,7 +110,7 @@ def train_policy_value_network(model, episodes, device):
       epoch_value_loss += value_loss.item()
 
       global step_count
-      if step_count % 20 == 0:
+      if step_count % 25 == 0:
         val_loss, val_priors_loss, val_value_loss = validate(model, val_dataloader, device, loss_scale_factor)
         with open('train.csv', 'a') as f:
           f.write(f'{step_count}')

@@ -75,15 +75,15 @@ def main():
   config = Config(
     seed=2389473453,
     seed_pool_size=2048,
-    episodes_per_iteration=2048,
+    episodes_per_iteration=1024,
     processes=4,
     step_size=32,
-    workers_per_process=24,
+    workers_per_process=16,
     move_threshold=4,
-    simulations_per_move=800,
+    simulations_per_move=400,
     mcts_thread_count=8,
     batch_size=32,
-    c_puct=2.5,
+    c_puct=1.25,
     virtual_loss=3,
     alpha=0.1
   )
