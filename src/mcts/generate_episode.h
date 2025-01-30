@@ -5,8 +5,7 @@
 namespace mcts {
 
 auto generate_episodes(
-  uint32_t seed,
-  int seed_pool_size,
+  const std::vector<State>&,
   int episodes_count,
   int worker_count,
   int move_threshold,

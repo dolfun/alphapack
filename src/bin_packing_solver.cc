@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/functional.h>
 #include <pybind11/stl.h>
-#include "mcts/state.h"
+#include "mcts/generate_init_states.h"
 #include "mcts/generate_episode.h"
 namespace py = pybind11;
 
@@ -52,8 +52,6 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly_static("action_count", &State::action_count)
     .def_readonly_static("item_count", &State::item_count)
     .def_readonly_static("values_per_item", &State::values_per_item)
-    .def_readonly_static("min_item_dim", &State::min_item_dim)
-    .def_readonly_static("max_item_dim", &State::max_item_dim)
 
     .def(py::pickle(
       [] (const State& state) { return py::bytes(State::serialize(state)); },
@@ -82,12 +80,30 @@ PYBIND11_MODULE(bin_packing_solver, m) {
       }
     ));
 
+  // generate_states
+  m.def(
+    "generate_random_init_states",
+    &generate_random_init_states,
+    py::arg("seed"),
+    py::arg("count"),
+    py::arg("min_item_dim"),
+    py::arg("max_item_dim")
+  );
+
+  m.def(
+    "generate_cut_init_states",
+    &generate_cut_init_states,
+    py::arg("seed"),
+    py::arg("count"),
+    py::arg("min_item_dim"),
+    py::arg("max_item_dim")
+  );
+
   // generate_episodes
   m.def(
     "generate_episodes",
     &mcts::generate_episodes,
-    py::arg("seed"),
-    py::arg("seed_pool_size"),
+    py::arg("states"),
     py::arg("episodes_count"),
     py::arg("worker_count"),
     py::arg("move_threshold"),

@@ -11,13 +11,12 @@ struct Node {
   std::shared_ptr<State> state;
 
   int action_idx{-1};
-  float prior{};
+  float prior{}, reward{};
   std::weak_ptr<Node> prev_node;
 
   std::atomic<bool> visited{}, evaluated{};
   std::atomic<int> visit_count{};
   std::atomic<float> total_action_value{};
-  std::atomic<float> reward{};
 
   using Ptr = std::shared_ptr<Node>;
   std::vector<Ptr> children;

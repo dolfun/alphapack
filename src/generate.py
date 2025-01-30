@@ -20,20 +20,21 @@ def load_episodes(file):
       break
   return episodes
 
-def init_worker(_config, model_path, _device):
-  global config, model, device
+def init_worker(_init_states, _config, _model_path, _device):
+  global init_states, config, model, device
 
+  init_states = _init_states
   config = _config
   device = _device
 
   model = PolicyValueNetwork().to(device)
-  model.load_state_dict(torch.load(model_path, weights_only=False))
+  model.load_state_dict(torch.load(_model_path, weights_only=False))
   model = torch.jit.script(model)
   model.eval()
 
 @torch.no_grad()
 def infer(states):
-  global model, device
+  global init_states, model, device
 
   image_data = [
     np.stack([
@@ -56,11 +57,10 @@ def infer(states):
   return result
 
 def generate_episodes_wrapper(episodes_count):
-  global config, model, device
+  global init_states, config, model, device
 
   episodes = bin_packing_solver.generate_episodes(
-    config.seed,
-    config.seed_pool_size,
+    init_states,
     episodes_count,
     config.workers_per_process,
     config.move_threshold,
@@ -75,14 +75,14 @@ def generate_episodes_wrapper(episodes_count):
 
   return episodes
 
-def generate_episodes(config, model_path, device, leave_progress_bar=True):
+def generate_episodes(init_states, config, model_path, device):
   file = tempfile.TemporaryFile()
-  initargs = (config, model_path, device)
+  initargs = (init_states, config, model_path, device)
   with mp.Pool(config.processes, initializer=init_worker, initargs=initargs) as pool:
     steps_count = (config.episodes_per_iteration + config.step_size - 1) // config.step_size
     args = [config.step_size for _ in range(steps_count)]
     it = pool.imap_unordered(generate_episodes_wrapper, args)
-    for episodes in tqdm(it, total=steps_count, leave=leave_progress_bar):
+    for episodes in tqdm(it, total=steps_count):
       for episode in episodes:
         pickle.dump(episode, file)
 

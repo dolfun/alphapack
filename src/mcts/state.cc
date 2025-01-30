@@ -71,24 +71,20 @@ auto State::feasibility_mask() const noexcept -> Array2D<int8_t> {
 }
 
 auto State::normalized_items() const noexcept -> std::vector<float> {
-  auto normalize_dim = [] (int val) {
-    return (static_cast<float>(val) - min_item_dim) / (max_item_dim - min_item_dim);
-  };
-
-  auto normalize_vol = [] (int val) {
-    constexpr float min_item_vol = (min_item_dim * min_item_dim * min_item_dim);
-    constexpr float max_item_vol = (max_item_dim * max_item_dim * max_item_dim);
-    return (static_cast<float>(val) - min_item_vol) / (max_item_vol - min_item_vol);
-  };
 
   std::vector<float> data(item_count * values_per_item);
   auto it = data.begin();
   for (const auto& item : m_items) {
     if (!item.placed) {
-      it[0] = normalize_dim(item.shape.x);
-      it[1] = normalize_dim(item.shape.y);
-      it[2] = normalize_dim(item.shape.z);
-      it[3] = normalize_vol(item.shape.x * item.shape.y * item.shape.z);
+      float x = static_cast<float>(item.shape.x) / bin_length;
+      float y = static_cast<float>(item.shape.y) / bin_length;
+      float z = static_cast<float>(item.shape.z) / bin_height;
+      float vol = x * y * z;
+
+      it[0] = x;
+      it[1] = y;
+      it[2] = z;
+      it[3] = vol;
     }
     it += 4;
   }
@@ -136,8 +132,7 @@ float State::transition(int action_idx) {
 
   m_feasibility_info = create_feasibility_info(m_items.front());
 
-  float reward = current_item.shape.x * current_item.shape.y * current_item.shape.z;
-  reward /= (bin_length * bin_length * bin_height);
+  float reward = 1.0f / static_cast<float>(item_count);
   return reward;
 }
 
@@ -210,7 +205,8 @@ constexpr std::pair<int, int> (*symmetry_transforms[8])(int, int, int, int, int)
 
 auto get_state_symmetry(const State& state, int k) noexcept -> State {
   auto items = state.m_items;
-  int l = items[0].shape.x, w = items[0].shape.y;
+  Item current_item = items.front();
+  int l = current_item.shape.x, w = current_item.shape.y;
 
   if (k % 2 == 1) {
     for (auto& item : items) {
@@ -228,10 +224,12 @@ auto get_state_symmetry(const State& state, int k) noexcept -> State {
   }
 
   Array2D<int8_t> feasibility_info { L, L, -1 };
-  for (int x = 0; x <= L - l; ++x) {
-    for (int y = 0; y <= L - w; ++y) {
-      auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);
-      feasibility_info(x1, y1) = state.m_feasibility_info(x, y);
+  if (!current_item.placed) {
+    for (int x = 0; x <= L - l; ++x) {
+      for (int y = 0; y <= L - w; ++y) {
+        auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);
+        feasibility_info(x1, y1) = state.m_feasibility_info(x, y);
+      }
     }
   }
 
@@ -241,8 +239,11 @@ auto get_state_symmetry(const State& state, int k) noexcept -> State {
 auto get_inverse_priors_symmetry(const State& state, const std::vector<float>& transformed_priors, int k) noexcept
     -> std::vector<float> {
 
+  Item current_item = state.items().front();
+  if (current_item.placed) return {};
+
   constexpr int L = State::bin_length;
-  int l = state.items()[0].shape.x, w = state.items()[0].shape.y;
+  int l = current_item.shape.x, w = current_item.shape.y;
 
   std::vector<float> priors(transformed_priors.size());
   for (int x = 0; x <= L - l; ++x) {
@@ -253,6 +254,6 @@ auto get_inverse_priors_symmetry(const State& state, const std::vector<float>& t
       priors[idx] = transformed_priors[idx1];
     }
   }
-  
+
   return priors;
 }

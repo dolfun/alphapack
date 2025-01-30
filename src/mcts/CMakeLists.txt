@@ -17,8 +17,11 @@ add_library(
   mcts.h
   mcts.cc
   evaluation.h
+  generate_init_states.h
+  generate_init_states.cc
   generate_episode.h
   generate_episode.cc
 )
+
 target_compile_features(mcts PRIVATE cxx_std_20)
 target_link_libraries(mcts PRIVATE pybind11::pybind11)

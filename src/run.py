@@ -1,10 +1,12 @@
 from policy_value_network import PolicyValueNetwork
 from train import train_policy_value_network
 from generate import generate_episodes
+from bin_packing_solver import State
+import bin_packing_solver as bps
 
 from dataclasses import dataclass
-from copy import copy
 import argparse
+import random
 import pickle
 import torch
 import os
@@ -20,7 +22,7 @@ if device != 'cuda':
 @dataclass
 class Config:
   seed: int
-  seed_pool_size: int
+  pool_size: int
   episodes_per_iteration: int
   processes: int
   step_size: int
@@ -33,12 +35,17 @@ class Config:
   virtual_loss: int
   alpha: float
 
-def perform_iteration(idx: int, config: Config, model_path: str, generate_only: bool):
+def perform_iteration(
+    idx: int,
+    init_states: list[State],
+    config: Config,
+    model_path: str,
+    generate_only: bool):
+
   # Simulate Games
   print('SIMULATING GAMES:')
-  episodes = generate_episodes(config, model_path, device)
-
-  with open(f'checkpoints/episodes_train{idx}.bin', 'wb') as f:
+  episodes = generate_episodes(init_states, config, model_path, device)
+  with open(f'checkpoints/episodes{idx}.bin', 'wb') as f:
     pickle.dump(episodes, f)
 
   print()
@@ -54,19 +61,6 @@ def perform_iteration(idx: int, config: Config, model_path: str, generate_only: 
   torch.save(model.state_dict(), model_path)
   print()
 
-  # Evaluation
-  print('EVALUATING:')
-  eval_config = copy(config)
-  eval_config.episodes_per_iteration = 256
-  eval_config.move_threshold = 0
-  eval_config.alpha = 0
-
-  episodes = generate_episodes(eval_config, model_path, device, leave_progress_bar=False)
-  with open(f'checkpoints/episodes_test{idx}.bin', 'wb') as f:
-    pickle.dump(episodes, f)
-
-  print()
-
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
@@ -76,19 +70,25 @@ def main():
 
   config = Config(
     seed=2389473453,
-    seed_pool_size=2048,
-    episodes_per_iteration=2048,
-    processes=4,
+    pool_size=2048,
+    episodes_per_iteration=1152,
+    processes=6,
     step_size=32,
     workers_per_process=16,
-    move_threshold=4,
-    simulations_per_move=512,
-    mcts_thread_count=8,
-    batch_size=32,
+    move_threshold=6,
+    simulations_per_move=1024,
+    mcts_thread_count=4,
+    batch_size=16,
     c_puct=1.25,
     virtual_loss=3,
     alpha=0.15
   )
+
+  # Generate init states
+  random_init_states = bps.generate_random_init_states(config.seed, config.pool_size // 2, 2, 5)
+  cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size // 2, 3, 6)
+  init_states = random_init_states + cut_init_states
+  random.shuffle(init_states)
 
   # Create model if does not exist
   if not os.path.exists(args.model_path):
@@ -99,7 +99,7 @@ def main():
   os.makedirs('checkpoints', exist_ok=True)
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(i + 1, config, args.model_path, args.generate_only)
+    perform_iteration(i + 1, init_states, config, args.model_path, args.generate_only)
 
 if __name__ == '__main__':
   main()

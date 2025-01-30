@@ -70,7 +70,7 @@ bool run_mcts_simulation(
 
   int symmetry_idx = symmetry_dist(engine);
   auto transformed_state = get_state_symmetry(*leaf_node->state, symmetry_idx);
-  auto evaluator_result = inference_queue.infer(std::make_shared<State>(std::move(transformed_state)));
+  auto inference_result = inference_queue.infer(std::make_shared<State>(std::move(transformed_state)));
 
   // Expansion
   auto actions = leaf_node->state->possible_actions();
@@ -83,7 +83,7 @@ bool run_mcts_simulation(
   }
 
   // Priors update
-  auto [priors, value] = evaluator_result.get();
+  auto [priors, value] = inference_result.get();
   priors = get_inverse_priors_symmetry(*leaf_node->state, priors, symmetry_idx);
 
   float total_valid_prior = 0.0f;

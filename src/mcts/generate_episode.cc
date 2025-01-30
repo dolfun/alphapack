@@ -6,45 +6,6 @@
 #include <atomic>
 #include <random>
 
-class SeedPool {
-public:
-  SeedPool(uint32_t seed, int pool_size) : seeds(pool_size), sample_dist(0, pool_size - 1) {
-    std::mt19937 engine { seed };
-    std::uniform_int_distribution<uint32_t> seed_dist{};
-    std::ranges::generate(seeds, [&] { return seed_dist(engine); });
-
-    static std::random_device rd;
-    seed_engine = std::mt19937 { rd() };
-  }
-
-  uint32_t get() noexcept {
-    return seeds[sample_dist(seed_engine)];
-  }
-
-private:
-  std::vector<std::uint32_t> seeds;
-  std::mt19937 seed_engine;
-  std::uniform_int_distribution<size_t> sample_dist;
-};
-
-auto generate_random_states(int count, SeedPool& seed_pool) -> std::vector<State> {
-  std::vector<State> states;
-  states.reserve(count);
-  for (int i = 0; i < count; ++i) {
-    auto seed = seed_pool.get();
-    std::mt19937 engine { seed };
-    std::uniform_int_distribution<int> dist { State::min_item_dim, State::max_item_dim };
-    std::vector<Item> items(State::item_count);
-    for (auto& item : items) {
-      item.shape.x = dist(engine);
-      item.shape.y = dist(engine);
-      item.shape.z = dist(engine);
-    }
-    states.emplace_back(items);
-  }
-  return states;
-}
-
 namespace mcts {
 
 auto generate_episode(
@@ -141,8 +102,7 @@ auto generate_episode(
 }
 
 auto generate_episodes(
-  uint32_t seed,
-  int seed_pool_size,
+  const std::vector<State>& states,
   int episodes_count,
   int worker_count,
   int move_threshold,
@@ -157,41 +117,41 @@ auto generate_episodes(
 
   std::mutex episodes_mutex;
   std::vector<std::vector<Evaluation>> episodes;
+  episodes.reserve(episodes_count);
 
-  SeedPool seed_pool { seed, seed_pool_size };
-  std::atomic<int> states_index{};
-  auto initial_states = generate_random_states(episodes_count, seed_pool);
-  InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
-  auto task = [&] {
-    auto episode = generate_episode(
-      initial_states[states_index.fetch_add(1)],
-      move_threshold,
-      simulations_per_move,
-      mcts_thread_count,
-      c_puct,
-      virtual_loss,
-      alpha,
-      inference_queue
-    );
+  std::random_device rd{};
+  std::mt19937 engine { rd() };
+  std::uniform_int_distribution<int> dist { 0, episodes_count - 1 };
 
-    std::lock_guard lock { episodes_mutex };
-    episodes.emplace_back(std::move(episode));
+  std::mutex rng_mutex;
+  auto sample_state_idx = [&] {
+    std::lock_guard lock { rng_mutex };
+    return dist(engine);
   };
 
+  InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
   std::atomic<int> work_done{}, threads_finished{};
   std::latch latch { worker_count + 1 };
   auto worker = [&] {
     latch.arrive_and_wait();
-    while (true) {
-      int current_work = work_done.load();
-      if (current_work >= episodes_count) {
-        break;
-      }
 
-      if (work_done.compare_exchange_strong(current_work, current_work + 1)) {
-        task();
-      }
+    while (work_done.fetch_add(1) < episodes_count) {
+      int state_idx = sample_state_idx();
+      auto episode = generate_episode(
+        states[state_idx],
+        move_threshold,
+        simulations_per_move,
+        mcts_thread_count,
+        c_puct,
+        virtual_loss,
+        alpha,
+        inference_queue
+      );
+
+      std::lock_guard lock { episodes_mutex };
+      episodes.emplace_back(std::move(episode));
     }
+
     ++threads_finished;
   };
 
