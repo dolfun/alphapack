@@ -121,7 +121,7 @@ auto generate_episodes(
 
   std::random_device rd{};
   std::mt19937 engine { rd() };
-  std::uniform_int_distribution<int> dist { 0, episodes_count - 1 };
+  std::uniform_int_distribution<size_t> dist { 0, states.size() - 1 };
 
   std::mutex rng_mutex;
   auto sample_state_idx = [&] {

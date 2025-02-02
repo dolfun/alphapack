@@ -83,7 +83,7 @@ def train_policy_value_network(model, episodes, device):
   print(f'{len(train_dataset)} samples loaded!')
 
   epochs = 8
-  lr = 0.02
+  lr = 0.2
   loss_scale_factor = 1.5
 
   model.train()
@@ -110,7 +110,7 @@ def train_policy_value_network(model, episodes, device):
       epoch_value_loss += value_loss.item()
 
       global step_count
-      if step_count % 10 == 0:
+      if step_count % 20 == 0:
         val_loss, val_priors_loss, val_value_loss = validate(model, val_dataloader, device, loss_scale_factor)
         with open('train.csv', 'a') as f:
           f.write(f'{step_count}')

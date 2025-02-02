@@ -6,7 +6,6 @@ import bin_packing_solver as bps
 
 from dataclasses import dataclass
 import argparse
-import random
 import pickle
 import torch
 import os
@@ -45,8 +44,8 @@ def perform_iteration(
   # Simulate Games
   print('SIMULATING GAMES:')
   episodes = generate_episodes(init_states, config, model_path, device)
-  with open(f'checkpoints/episodes{idx}.bin', 'wb') as f:
-    pickle.dump(episodes, f)
+  with open(f'checkpoints/episodes{idx}.bin', 'wb') as file:
+    pickle.dump(episodes, file)
 
   print()
 
@@ -64,7 +63,6 @@ def perform_iteration(
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--iteration_count', type=int, default=1)
-  parser.add_argument('--model_path', default='policy_value_network.pth')
   parser.add_argument('--generate_only', action='store_true')
   args = parser.parse_args()
 
@@ -73,7 +71,7 @@ def main():
     pool_size=2048,
     episodes_per_iteration=1152,
     processes=6,
-    step_size=32,
+    step_size=96,
     workers_per_process=16,
     move_threshold=6,
     simulations_per_move=1024,
@@ -81,25 +79,28 @@ def main():
     batch_size=16,
     c_puct=1.25,
     virtual_loss=3,
-    alpha=0.15
+    alpha=0.25
   )
 
   # Generate init states
-  random_init_states = bps.generate_random_init_states(config.seed, config.pool_size // 2, 2, 5)
-  cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size // 2, 3, 6)
-  init_states = random_init_states + cut_init_states
-  random.shuffle(init_states)
+  # random_init_states = bps.generate_random_init_states(config.seed, config.pool_size // 2, 2, 5)
+  # cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size // 2, 3, 6)
+  # init_states = random_init_states + cut_init_states
+  # random.shuffle(init_states)
+
+  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
 
   # Create model if does not exist
-  if not os.path.exists(args.model_path):
+  model_path = 'policy_value_network.pth'
+  if not os.path.exists(model_path):
     print('Creating new model!')
     model = PolicyValueNetwork().to(device)
-    torch.save(model.state_dict(), args.model_path)
+    torch.save(model.state_dict(), model_path)
 
   os.makedirs('checkpoints', exist_ok=True)
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(i + 1, init_states, config, args.model_path, args.generate_only)
+    perform_iteration(i + 1, init_states, config, model_path, args.generate_only)
 
 if __name__ == '__main__':
   main()

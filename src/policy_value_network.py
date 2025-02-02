@@ -23,12 +23,12 @@ class ResidualBlock(nn.Module):
     return out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, nr_residual_blocks=5):
+  def __init__(self, nr_residual_blocks=6):
     super(PolicyValueNetwork, self).__init__()
     base_size = State.bin_length
     in_channels = 2
     additional_input_size = State.item_count * State.values_per_item
-    nr_channels = 64
+    nr_channels = 32
 
     self.conv_init = nn.Sequential(
       nn.Conv2d(in_channels, nr_channels, kernel_size=3, stride=1, padding=1),
