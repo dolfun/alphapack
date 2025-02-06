@@ -45,42 +45,12 @@ class ExperienceReplay(Dataset):
   def __getitem__(self, idx):
     return self.samples[idx]
 
-@torch.no_grad()
-def validate(model, dataloader, device, loss_scale_factor):
-  total_loss = 0.0
-  total_priors_loss = 0.0
-  total_value_loss = 0.0
-  for inputs in dataloader:
-    inputs = (tensor.to(device) for tensor in list(inputs))
-    image_data, additional_data, priors, value = inputs
-
-    predicted_priors, predicted_value = model(image_data, additional_data)
-    priors_loss = F.cross_entropy(predicted_priors, priors)
-    value_loss = loss_scale_factor * F.mse_loss(predicted_value, value)
-    loss = priors_loss + value_loss
-
-    total_loss += loss.item()
-    total_priors_loss += priors_loss.item()
-    total_value_loss += value_loss.item()
-
-  total_loss /= len(dataloader)
-  total_priors_loss /= len(dataloader)
-  total_value_loss /= len(dataloader)
-  return total_loss, total_priors_loss, total_value_loss
-
 step_count = 0
 def train_policy_value_network(model, episodes, device):
   samples = prepare_samples(episodes)
-  np.random.shuffle(samples)
-
-  split_ratio = 0.95
-  split_count = int(split_ratio * len(samples))
-  train_samples, val_samples = samples[:split_count], samples[split_count:]
-  train_dataset = ExperienceReplay(train_samples, augment=True)
-  val_datset = ExperienceReplay(val_samples, augment=True)
-  train_dataloader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
-  val_dataloader = DataLoader(val_datset, batch_size=2048)
-  print(f'{len(train_dataset)} samples loaded!')
+  dataset = ExperienceReplay(samples, augment=True)
+  dataloader = DataLoader(dataset, batch_size=2048, shuffle=True)
+  print(f'{len(dataset)} samples loaded!')
 
   epochs = 8
   lr = 0.2
@@ -88,11 +58,12 @@ def train_policy_value_network(model, episodes, device):
 
   model.train()
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+  train_log_file = open('train_log.csv', 'a')
   for epoch in range(epochs):
     epoch_loss = 0.0
     epoch_priors_loss = 0.0
     epoch_value_loss = 0.0
-    for inputs in tqdm(train_dataloader, leave=False):
+    for inputs in tqdm(dataloader, leave=False):
       inputs = (tensor.to(device) for tensor in list(inputs))
       image_data, additional_data, priors, value = inputs
 
@@ -110,20 +81,12 @@ def train_policy_value_network(model, episodes, device):
       epoch_value_loss += value_loss.item()
 
       global step_count
-      if step_count % 20 == 0:
-        val_loss, val_priors_loss, val_value_loss = validate(model, val_dataloader, device, loss_scale_factor)
-        with open('train.csv', 'a') as f:
-          f.write(f'{step_count}')
-          f.write(f',{loss.item():.4f},{priors_loss.item():.4f},{value_loss.item():.4f}')
-          f.write(f',{val_loss:.4f},{val_priors_loss:.4f},{val_value_loss:.4f}\n')
-
       step_count += 1
+      train_log_file.write(f'{step_count}')
+      train_log_file.write(f',{loss.item():.4f},{priors_loss.item():.4f},{value_loss.item():.4f}\n')
 
-    epoch_loss /= len(train_dataloader)
-    epoch_priors_loss /= len(train_dataloader)
-    epoch_value_loss /= len(train_dataloader)
+    epoch_loss /= len(dataloader)
+    epoch_priors_loss /= len(dataloader)
+    epoch_value_loss /= len(dataloader)
     print(f'Epoch [{epoch+1:2}/{epochs}] -> ', end='')
-    print(f'Train: {epoch_loss:.4f} = {epoch_priors_loss:.4f} + {epoch_value_loss:.4f}; ', end='')
-
-    val_loss, val_priors_loss, val_value_loss = validate(model, val_dataloader, device, loss_scale_factor)
-    print(f'Val: {val_loss:.4f} = {val_priors_loss:.4f} + {val_value_loss:.4f}')
+    print(f'Loss: {epoch_loss:.4f} = {epoch_priors_loss:.4f} + {epoch_value_loss:.4f}')

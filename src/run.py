@@ -6,6 +6,7 @@ import bin_packing_solver as bps
 
 from dataclasses import dataclass
 import argparse
+import random
 import pickle
 import torch
 import os
@@ -72,23 +73,24 @@ def main():
     episodes_per_iteration=1152,
     processes=6,
     step_size=96,
-    workers_per_process=16,
+    workers_per_process=32,
     move_threshold=6,
     simulations_per_move=1024,
-    mcts_thread_count=4,
-    batch_size=16,
+    mcts_thread_count=8,
+    batch_size=64,
     c_puct=1.25,
-    virtual_loss=3,
+    virtual_loss=1,
     alpha=0.25
   )
 
   # Generate init states
-  # random_init_states = bps.generate_random_init_states(config.seed, config.pool_size // 2, 2, 5)
-  # cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size // 2, 3, 6)
-  # init_states = random_init_states + cut_init_states
-  # random.shuffle(init_states)
+  random_init_states = bps.generate_random_init_states(config.seed, config.pool_size, 2, 5)
+  cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
+  init_states = random_init_states + cut_init_states
+  random.shuffle(init_states)
 
-  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
+  # init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
+  # init_states = bps.generate_random_init_states(config.seed, config.pool_size, 2, 5)
 
   # Create model if does not exist
   model_path = 'policy_value_network.pth'
