@@ -42,7 +42,13 @@ async def infer(request: Request):
   data = await request.json()
   image_data = torch.tensor(data['height_map'], dtype=torch.float32, device=device)
   image_data /= State.bin_height
-  image_data = image_data.view((1, 1, State.bin_length, State.bin_length))
+  image_data = image_data.view((State.bin_length, State.bin_length))
+
+  feasibility_mask = torch.tensor(data['mask'], dtype=torch.float32, device=device)
+  feasibility_mask = feasibility_mask.view((State.bin_length, State.bin_length))
+
+  image_data = torch.stack((image_data, feasibility_mask))
+  image_data = image_data.view((1, 2, State.bin_length, State.bin_length))
 
   additional_data = []
   for item in data['items']:

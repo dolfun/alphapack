@@ -286,8 +286,16 @@ function getInferenceData(grid, items) {
     }
   }
 
+  const mask = [];
+  for (let i = 0; i < grid.info.length; ++i) {
+    for (let j = 0; j < grid.info.length; ++j) {
+      mask.push(grid.isValidPlacement(i, j, items[0].length, items[0].width, items[0].height));
+    }
+  }
+
   const data = {
     'height_map': gridData,
+    'mask': mask,
     'items': items
   };
 
