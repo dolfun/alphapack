@@ -70,10 +70,10 @@ def main():
   config = Config(
     seed=2389473453,
     pool_size=2048,
-    episodes_per_iteration=1152,
+    episodes_per_iteration=768,
     processes=6,
-    step_size=96,
-    workers_per_process=8,
+    step_size=64,
+    workers_per_process=16,
     move_threshold=6,
     simulations_per_move=2048,
     mcts_thread_count=8,
