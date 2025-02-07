@@ -1,52 +1,69 @@
 #include "state.h"
-#include <map>
 #include <cstring>
 #include <algorithm>
 
-// Optimize further using max queue
 template <typename T>
-auto get_max_freq_in_window(const Array2D<T>& arr, Vec3i shape) -> Array2D<std::pair<T, int>> {
-  std::size_t n_arr = arr.rows(), m_arr = arr.cols();
-  std::size_t n_shape = shape.x, m_shape = shape.y;
+class SingleUseMaxQueue {
+public:
+  constexpr SingleUseMaxQueue(size_t size)
+    : m_data(size), it_front { m_data.begin() }, it_back { m_data.begin() } {}
 
-  Array2D<std::pair<T, int>> res { n_arr, m_arr };
-  for (std::size_t x = 0; x < n_arr; ++x) {
-    std::map<int, int, std::greater<>> freq;
-    for (std::size_t y = 0; y < m_shape; ++y) {
-      ++freq[arr(x, y)];
-    }
-
-    for (std::size_t y = 0; y < m_arr - m_shape; ++y) {
-      res(x, y) = *freq.begin();
-
-      int val = arr(x, y);
-      if (--freq[val] == 0) {
-        freq.erase(val);
-      }
-
-      ++freq[arr(x, y + m_shape)];
-    }
-    res(x, m_arr - m_shape) = *freq.begin();
+  constexpr T max() const noexcept {
+    return *it_front;
   }
 
-  for (std::size_t y = 0; y <= m_arr - m_shape; ++y) {
-    std::map<int, int, std::greater<>> freq;
-    for (std::size_t x = 0; x < n_shape; ++x) {
-      freq[res(x, y).first] += res(x, y).second;
+  constexpr void insert(T item) noexcept {
+    while (it_front < it_back && *std::prev(it_back) < item) {
+      --it_back;
+    }
+    *(it_back++) = item;
+  }
+
+  constexpr void remove(T item) noexcept {
+    if (it_front < it_back && *it_front == item) {
+      ++it_front;
+    }
+  }
+
+private:
+  std::vector<T> m_data;
+  std::vector<T>::iterator it_front, it_back;
+};
+
+template <typename T>
+auto get_max_in_window(const Array2D<T>& arr, int length, int width) -> Array2D<T> {
+  size_t n_arr = arr.rows(), m_arr = arr.cols();
+
+  Array2D<T> res { n_arr, m_arr };
+  for (size_t x = 0; x < n_arr; ++x) {
+    SingleUseMaxQueue<T> max_queue { m_arr };
+    for (int y = 0; y < width; ++y) {
+      max_queue.insert(arr(x, y));
     }
 
-    for (std::size_t x = 0; x < n_arr - n_shape; ++x) {
-      auto [val, cnt] = res(x, y);
-      res(x, y) = *freq.begin();
-
-      freq[val] -= cnt;
-      if (freq[val] == 0) {
-        freq.erase(val);
-      }
-
-      freq[res(x + n_shape, y).first] += res(x + n_shape, y).second;
+    for (size_t y = 0; y < m_arr - width; ++y) {
+      res(x, y) = max_queue.max();
+      max_queue.remove(arr(x, y));
+      max_queue.insert(arr(x, y + width));
     }
-    res(n_arr - n_shape, y) = *freq.begin();
+
+    res(x, m_arr - width) = max_queue.max();
+  }
+
+  for (size_t y = 0; y <= m_arr - width; ++y) {
+    SingleUseMaxQueue<T> max_queue { n_arr };
+    for (int x = 0; x < length; ++x) {
+      max_queue.insert(res(x, y));
+    }
+
+    for (size_t x = 0; x < n_arr - length; ++x) {
+      T item_to_remove = res(x, y);
+      res(x, y) = max_queue.max();
+      max_queue.remove(item_to_remove);
+      max_queue.insert(res(x + length, y));
+    }
+
+    res(n_arr - length, y) = max_queue.max();
   }
 
   return res;
@@ -187,10 +204,10 @@ auto State::create_feasibility_info(const Item& item) const noexcept -> Array2D<
   Array2D<int8_t> info { bin_length, bin_length, -1 };
   if (item.placed) return info;
 
-  auto max_height_freq = get_max_freq_in_window(m_height_map, item.shape);
-  for (std::size_t x = 0; x <= info.rows() - item.shape.x; ++x) {
-    for (std::size_t y = 0; y <= info.cols() - item.shape.y; ++y) {
-      auto [max_height, _] = max_height_freq(x, y);
+  auto max_height_arr = get_max_in_window(m_height_map, item.shape.x, item.shape.y);
+  for (size_t x = 0; x <= info.rows() - item.shape.x; ++x) {
+    for (size_t y = 0; y <= info.cols() - item.shape.y; ++y) {
+      int max_height = max_height_arr(x, y);
       if (max_height + item.shape.z > bin_height) continue;
       info(x, y) = max_height;
     }

@@ -52,8 +52,8 @@ def train_policy_value_network(model, episodes, device):
   dataloader = DataLoader(dataset, batch_size=2048, shuffle=True)
   print(f'{len(dataset)} samples loaded!')
 
-  epochs = 8
-  lr = 0.2
+  epochs = 2
+  lr = 0.002
   loss_scale_factor = 1.5
 
   model.train()
