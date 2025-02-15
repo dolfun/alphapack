@@ -88,7 +88,6 @@ auto State::feasibility_mask() const noexcept -> Array2D<int8_t> {
 }
 
 auto State::normalized_items() const noexcept -> std::vector<float> {
-
   std::vector<float> data(item_count * values_per_item);
   auto it = data.begin();
   for (const auto& item : m_items) {
@@ -96,14 +95,13 @@ auto State::normalized_items() const noexcept -> std::vector<float> {
       float x = static_cast<float>(item.shape.x) / bin_length;
       float y = static_cast<float>(item.shape.y) / bin_length;
       float z = static_cast<float>(item.shape.z) / bin_height;
-      float vol = x * y * z;
 
       it[0] = x;
       it[1] = y;
       it[2] = z;
-      it[3] = vol;
     }
-    it += 4;
+
+    it += values_per_item;
   }
   return data;
 }
@@ -127,11 +125,11 @@ auto State::possible_actions() const -> std::vector<int> {
   for (int x = 0; x < m_feasibility_info.rows(); ++x) {
     for (int y = 0; y < m_feasibility_info.cols(); ++y) {
       if (m_feasibility_info(x, y) >= 0) {
-        actions.push_back(x * m_feasibility_info.cols() + y);
+        actions.push_back(x * State::bin_length + y);
       }
     }
   }
-  
+
   return actions;
 }
 

@@ -26,8 +26,8 @@ public:
   static constexpr int bin_length = 10;
   static constexpr int bin_height = 10;
   static constexpr size_t action_count = bin_length * bin_length;
-  static constexpr size_t item_count = 24;
-  static constexpr size_t values_per_item = 4;
+  static constexpr size_t item_count = 48;
+  static constexpr size_t values_per_item = 3;
 
 private:
   State(std::vector<Item>&& items, Array2D<int8_t>&& height_map, Array2D<int8_t>&& feasibility_info)
