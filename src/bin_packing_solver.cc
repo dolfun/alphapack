@@ -96,7 +96,8 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     py::arg("seed"),
     py::arg("count"),
     py::arg("min_item_dim"),
-    py::arg("max_item_dim")
+    py::arg("max_item_dim"),
+    py::arg("min_packing_efficiency")
   );
 
   // generate_episodes

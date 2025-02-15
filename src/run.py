@@ -70,27 +70,31 @@ def main():
   config = Config(
     seed=2389473453,
     pool_size=2048,
-    episodes_per_iteration=768,
+    episodes_per_iteration=1152,
     processes=6,
-    step_size=64,
+    step_size=96,
     workers_per_process=16,
-    move_threshold=6,
-    simulations_per_move=2048,
+    move_threshold=12,
+    simulations_per_move=1024,
     mcts_thread_count=8,
-    batch_size=48,
+    batch_size=32,
     c_puct=1.25,
     virtual_loss=1,
     alpha=0.25
   )
 
   # Generate init states
-  random_init_states = bps.generate_random_init_states(config.seed, config.pool_size, 2, 5)
-  cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
-  init_states = random_init_states + cut_init_states
-  random.shuffle(init_states)
+  # random_init_states = bps.generate_random_init_states(config.seed, config.pool_size, 1, 5)
+  # cut_init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5)
+  # init_states = random_init_states + cut_init_states
+  # random.shuffle(init_states)
 
-  # init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 3, 6)
-  # init_states = bps.generate_random_init_states(config.seed, config.pool_size, 2, 5)
+  # init_states_50 = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.5)
+  # init_states_75 = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.75)
+  # init_states = init_states_50 + init_states_75
+  # random.shuffle(init_states)
+
+  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.75)
 
   # Create model if does not exist
   model_path = 'policy_value_network.pth'
