@@ -80,7 +80,7 @@ class ValueHead(nn.Module):
     return x_out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, nr_input_features=2, nr_residual_blocks=6, nr_channels=32):
+  def __init__(self, nr_input_features=2, nr_residual_blocks=6, nr_channels=64):
     super().__init__()
 
     additional_input_size = State.item_count * State.values_per_item
