@@ -84,6 +84,20 @@ bool run_mcts_simulation(
 
   // Priors update
   auto [priors, value] = inference_result.get();
+
+  // Apply softmax
+  float priors_sum = 0;
+  float max_prior = *std::ranges::max_element(priors);
+  for (float& prior : priors) {
+    prior = std::exp(prior - max_prior);
+    priors_sum += prior;
+  }
+
+  for (float& prior : priors) {
+    prior /= priors_sum;
+  }
+
+  // Apply innverse dihedral transform
   priors = get_inverse_priors_symmetry(*leaf_node->state, priors, symmetry_idx);
 
   float total_valid_prior = 0.0f;
@@ -100,7 +114,7 @@ bool run_mcts_simulation(
     std::gamma_distribution<float> dist { alpha };
     std::vector<float> dirichlet_noise(leaf_node->children.size());
     std::ranges::generate(dirichlet_noise, [&] { return dist(engine); });
-    auto dirichlet_noise_sum = std::accumulate(dirichlet_noise.begin(), dirichlet_noise.end(), 0.0f);
+    auto dirichlet_noise_sum = std::reduce(dirichlet_noise.begin(), dirichlet_noise.end());
 
     for (size_t i = 0; i < leaf_node->children.size(); ++i) {
       NodePtr child = leaf_node->children[i];

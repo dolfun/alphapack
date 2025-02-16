@@ -52,7 +52,6 @@ def infer(states):
   image_data = torch.tensor(np.stack(image_data), device=device)
   additional_data = torch.tensor(np.stack(additional_data), device=device)
   priors, value = model.forward(image_data, additional_data)
-  priors = torch.softmax(priors, dim=-1)
   result = (priors.cpu().numpy(), value.cpu().numpy())
   return result
 
