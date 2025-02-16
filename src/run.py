@@ -37,13 +37,13 @@ class Config:
 
 def perform_iteration(
     idx: int,
-    init_states: list[State],
     config: Config,
     model_path: str,
     generate_only: bool):
 
   # Simulate Games
   print('SIMULATING GAMES:')
+  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.70, 0.80)
   episodes = generate_episodes(init_states, config, model_path, device)
   with open(f'checkpoints/episodes{idx}.bin', 'wb') as file:
     pickle.dump(episodes, file)
@@ -83,8 +83,6 @@ def main():
     alpha=0.3
   )
 
-  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.75)
-
   # Create model if does not exist
   model_path = 'policy_value_network.pth'
   if not os.path.exists(model_path):
@@ -95,7 +93,7 @@ def main():
   os.makedirs('checkpoints', exist_ok=True)
   for i in range(args.iteration_count):
     print(f'[{i + 1}/{args.iteration_count}]')
-    perform_iteration(i + 1, init_states, config, model_path, args.generate_only)
+    perform_iteration(i + 1, config, model_path, args.generate_only)
 
 if __name__ == '__main__':
   main()

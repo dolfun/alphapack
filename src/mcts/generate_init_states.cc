@@ -27,11 +27,18 @@ struct PlacedItem {
 
 class CutStateGenerator {
 public:
-  CutStateGenerator(uint32_t seed, int _min_item_dim, int _max_item_dim, float _min_packing_efficiency)
+  CutStateGenerator(
+    uint32_t seed,
+    int _min_item_dim,
+    int _max_item_dim,
+    float _min_packing_efficiency,
+    float _max_packing_efficiency)
+
     : engine { seed }, 
       min_item_dim { _min_item_dim },
       max_item_dim { _max_item_dim },
-      min_packing_efficiency { _min_packing_efficiency } {}
+      min_packing_efficiency { _min_packing_efficiency },
+      max_packing_efficiency { _max_packing_efficiency } {}
 
   auto generate(size_t count) -> std::vector<State> {
     std::vector<State> states;
@@ -116,18 +123,18 @@ private:
       items[i].placed = false;
     }
 
+    static std::random_device rd{};
+    static std::mt19937 engine { rd() };
+    std::uniform_real_distribution<float> dist { min_packing_efficiency, max_packing_efficiency };
+    float expected_packing_efficiency = dist(engine);
+
     State state { items };
-    float packing_efficiency = 0.0f;
     for (auto item : valid_items) {
-      if (packing_efficiency >= min_packing_efficiency) break;
+      if (state.packing_efficiency() >= expected_packing_efficiency) break;
       if (state.possible_actions().empty()) break;
 
       int action_idx = item.pos.x * State::bin_length + item.pos.y;
       (void)state.transition(action_idx);
-
-      int item_volume = item.shape.x * item.shape.y * item.shape.z;
-      int bin_volume = State::bin_length * State::bin_length * State::bin_height;
-      packing_efficiency += static_cast<float>(item_volume) / bin_volume;
     }
 
     return state;
@@ -135,7 +142,7 @@ private:
 
   std::mt19937 engine;
   int min_item_dim, max_item_dim;
-  float min_packing_efficiency;
+  float min_packing_efficiency, max_packing_efficiency;
 };
 
 auto generate_cut_init_states(
@@ -143,9 +150,10 @@ auto generate_cut_init_states(
   size_t count,
   int min_item_dim,
   int max_item_dim,
-  float min_packing_efficiency)
+  float min_packing_efficiency,
+  float max_packing_efficiency)
     -> std::vector<State> {
 
-  CutStateGenerator generator { seed, min_item_dim, max_item_dim, min_packing_efficiency };
+  CutStateGenerator generator { seed, min_item_dim, max_item_dim, min_packing_efficiency, max_packing_efficiency };
   return generator.generate(count);
 }
