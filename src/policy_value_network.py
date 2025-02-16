@@ -41,18 +41,18 @@ class Trunk(nn.Module):
     merged_out = self.bn(merged_out)
     merged_out = self.relu(merged_out)
     return merged_out
-  
+
 class PolicyHead(nn.Module):
-  def __init__(self, nr_channels, image_size):
+  def __init__(self, nr_trunk_channels, nr_head_channels, image_size):
     super().__init__()
 
     base_size = image_size * image_size
     self.policy_head = nn.Sequential(
-      nn.Conv2d(nr_channels, 2, kernel_size=1),
-      nn.BatchNorm2d(2),
+      nn.Conv2d(nr_trunk_channels, nr_head_channels, kernel_size=1),
+      nn.BatchNorm2d(nr_head_channels),
       nn.ReLU(),
       nn.Flatten(),
-      nn.Linear(2 * base_size, base_size)
+      nn.Linear(nr_head_channels * base_size, base_size)
     )
 
   def forward(self, x_in):
@@ -60,19 +60,18 @@ class PolicyHead(nn.Module):
     return x_out
 
 class ValueHead(nn.Module):
-  def __init__(self, nr_channels, image_size):
+  def __init__(self, nr_trunk_channels, nr_head_channels, nr_supports, image_size):
     super().__init__()
 
     base_size = image_size * image_size
     self.value_head = nn.Sequential(
-      nn.Conv2d(nr_channels, 2, kernel_size=1),
-      nn.BatchNorm2d(2),
+      nn.Conv2d(nr_trunk_channels, nr_head_channels, kernel_size=1),
+      nn.BatchNorm2d(nr_head_channels),
       nn.ReLU(),
       nn.Flatten(),
-      nn.Linear(2 * base_size, 256),
+      nn.Linear(nr_head_channels * base_size, 256),
       nn.ReLU(),
-      nn.Linear(256, 1),
-      nn.Sigmoid()
+      nn.Linear(256, nr_supports)
     )
 
   def forward(self, x_in):
@@ -85,8 +84,8 @@ class PolicyValueNetwork(nn.Module):
 
     additional_input_size = State.item_count * State.values_per_item
     self.trunk = Trunk(nr_input_features, additional_input_size, nr_residual_blocks, nr_channels)
-    self.policy_head = PolicyHead(nr_channels, image_size=State.bin_length)
-    self.value_head = ValueHead(nr_channels, image_size=State.bin_length)
+    self.policy_head = PolicyHead(nr_channels, 2, State.bin_length)
+    self.value_head = ValueHead(nr_channels, 2, State.value_support_count, State.bin_length)
 
   def forward(self, image_in, additional_in):
     output = self.trunk(image_in, additional_in)

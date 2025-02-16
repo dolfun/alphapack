@@ -80,23 +80,34 @@ bool run_mcts_simulation(
     leaf_node->children.push_back(child);
   }
 
-  // Priors update
-  auto [priors, value] = inference_result.get();
+  // Waiting for evaluation result
+  auto [transformed_priors, value_supports] = inference_result.get();
 
-  // Apply softmax
-  float priors_sum = 0;
-  float max_prior = *std::ranges::max_element(priors);
-  for (float& prior : priors) {
-    prior = std::exp(prior - max_prior);
-    priors_sum += prior;
-  }
+  // Applying softmax
+  auto apply_softmax = [] (auto& arr) {
+    float sum = 0.0f;
+    float max_val = *std::ranges::max_element(arr);
+    for (auto& val : arr) {
+      val = std::exp(val - max_val);
+      sum += val;
+    }
 
-  for (float& prior : priors) {
-    prior /= priors_sum;
+    for (auto& val : arr) {
+      val /= sum;
+    }
+  };
+
+  apply_softmax(transformed_priors);
+  apply_softmax(value_supports);
+
+  // Extract value from supports
+  float value = 0.0f;
+  for (int i = 0; i < State::value_support_count; ++i) {
+    value += value_supports[i] * i / (State::value_support_count - 1); 
   }
 
   // Apply innverse dihedral transform
-  priors = get_inverse_priors_symmetry(*leaf_node->state, priors, symmetry_idx);
+  auto priors = get_inverse_priors_symmetry(*leaf_node->state, transformed_priors, symmetry_idx);
 
   float total_valid_prior = 0.0f;
   for (auto action_idx : actions) {

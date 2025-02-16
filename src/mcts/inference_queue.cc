@@ -39,11 +39,11 @@ void InferenceQueue::run() noexcept {
     auto values_ptr = static_cast<float*>(values.request().ptr);
     for (size_t i = 0; i < batch_size; ++i) {
       Result result;
-      result.first.resize(State::action_count);
       std::memcpy(result.first.data(), priors_ptr, sizeof(float) * State::action_count);
       priors_ptr += State::action_count;
+      std::memcpy(result.second.data(), values_ptr, sizeof(float) * State::value_support_count);
+      values_ptr += State::value_support_count;
 
-      result.second = values_ptr[i];
       promises[i].set_value(std::move(result));
     }
   }

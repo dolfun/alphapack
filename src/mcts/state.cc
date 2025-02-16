@@ -257,16 +257,19 @@ auto get_state_symmetry(const State& state, int k) noexcept -> State {
   return State(std::move(items), std::move(height_map), std::move(feasibility_info));
 }
 
-auto get_inverse_priors_symmetry(const State& state, const std::vector<float>& transformed_priors, int k) noexcept
-    -> std::vector<float> {
+auto get_inverse_priors_symmetry(
+  const State& state,
+  const std::array<float, State::action_count>& transformed_priors,
+  int k) noexcept
+    -> std::array<float, State::action_count> {
 
   Item current_item = state.items().front();
-  if (current_item.placed) return {};
+  if (current_item.placed) return {}; // !?
 
   constexpr int L = State::bin_length;
   int l = current_item.shape.x, w = current_item.shape.y;
 
-  std::vector<float> priors(transformed_priors.size());
+  std::array<float, State::action_count> priors{};
   for (int x = 0; x <= L - l; ++x) {
     for (int y = 0; y <= L - w; ++y) {
       auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);

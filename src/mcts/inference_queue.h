@@ -10,7 +10,11 @@
 
 class InferenceQueue {
 public:
-  using Result = std::pair<std::vector<float>, float>;
+  using Result = std::pair<
+    std::array<float, State::action_count>, 
+    std::array<float, State::value_support_count>
+  >;
+
   using InferFunc = std::function<
     std::pair<pybind11::array_t<float>, pybind11::array_t<float>>(const std::vector<std::shared_ptr<State>>&)
   >;

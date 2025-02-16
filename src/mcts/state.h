@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <string>
 #include <cstdint>
 #include "item.h"
@@ -26,8 +27,9 @@ public:
   static constexpr int bin_length = 10;
   static constexpr int bin_height = 10;
   static constexpr int action_count = bin_length * bin_length;
-  static constexpr int item_count = 48;
+  static constexpr int item_count = 64;
   static constexpr int values_per_item = 3;
+  static constexpr int value_support_count = 101;
 
 private:
   State(std::vector<Item>&& items, Array2D<int8_t>&& height_map, Array2D<int8_t>&& feasibility_info)
@@ -45,4 +47,5 @@ private:
 };
 
 auto get_state_symmetry(const State&, int) noexcept -> State;
-auto get_inverse_priors_symmetry(const State&, const std::vector<float>&, int) noexcept -> std::vector<float>;
+auto get_inverse_priors_symmetry(const State&, const std::array<float, State::action_count>&, int) noexcept
+  -> std::array<float, State::action_count>;

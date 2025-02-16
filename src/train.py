@@ -20,7 +20,14 @@ def prepare_samples(episodes):
       additional_data = np.array(state.normalized_items, dtype=np.float32)
 
       priors = np.array(evaluation.priors, dtype=np.float32)
-      value = np.array([evaluation.reward], dtype=np.float32)
+
+      scaled_reward = evaluation.reward * (State.value_support_count - 1)
+      support_idx = int(np.floor(scaled_reward))
+      support_contribution = support_idx + 1 - scaled_reward
+      value = np.zeros((State.value_support_count), dtype=np.float32)
+      value[support_idx] = support_contribution
+      if support_idx + 1 < State.value_support_count:
+        value[support_idx + 1] = 1 - support_contribution
 
       current_item_shape = (state.items[0].shape.x, state.items[0].shape.y)
       samples.append((image_data, additional_data, priors, value, current_item_shape))
@@ -52,9 +59,9 @@ def train_policy_value_network(model, episodes, device):
   dataloader = DataLoader(dataset, batch_size=2048, shuffle=True)
   print(f'{len(dataset)} samples loaded!')
 
-  epochs = 12
-  lr = 0.1
-  loss_scale_factor = 1.5
+  epochs = 16
+  lr = 0.02
+  value_loss_scale_factor = 1.5
 
   model.train()
   optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
@@ -69,7 +76,7 @@ def train_policy_value_network(model, episodes, device):
 
       predicted_priors, predicted_value = model(image_data, additional_data)
       priors_loss = F.cross_entropy(predicted_priors, priors)
-      value_loss = loss_scale_factor * F.mse_loss(predicted_value, value)
+      value_loss = value_loss_scale_factor * F.cross_entropy(predicted_value, value)
       loss = priors_loss + value_loss
 
       optimizer.zero_grad()
