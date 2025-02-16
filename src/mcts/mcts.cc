@@ -30,19 +30,17 @@ bool run_mcts_simulation(
       return true;
     }
 
-    int total_visit_count = current_node->visit_count.load(std::memory_order_relaxed) - 1;
-    float sqrt_total_visit = std::sqrt(std::max(0, total_visit_count));
-    auto calculate_score = [c_puct, sqrt_total_visit] (NodePtr node) {
-      int visit_count = node->visit_count.load(std::memory_order_relaxed);
-      float total_action_value = node->total_action_value.load(std::memory_order_relaxed);
+    float sqrt_parent_visit_count = std::sqrt(current_node->visit_count.load(std::memory_order_relaxed));
+    auto calculate_ucb_score = [c_puct, sqrt_parent_visit_count] (NodePtr child) {
+      int visit_count = child->visit_count.load(std::memory_order_relaxed);
+      float total_action_value = child->total_action_value.load(std::memory_order_relaxed);
 
-      float mean_action_value = (visit_count > 0 ? total_action_value / visit_count : 0);
-      float puct_score = c_puct * node->prior * sqrt_total_visit / (1 + visit_count);
-      float score = mean_action_value + puct_score;
-      return score;
+      float value_score = (visit_count > 0 ? child->reward + total_action_value / visit_count : 0);
+      float prior_score = c_puct * child->prior * sqrt_parent_visit_count / (1 + visit_count);
+      return value_score + prior_score;
     };
 
-    NodePtr next_node = *std::ranges::max_element(current_node->children, {}, calculate_score);
+    NodePtr next_node = *std::ranges::max_element(current_node->children, {}, calculate_ucb_score);
     search_path.push_back(next_node);
   }
 
