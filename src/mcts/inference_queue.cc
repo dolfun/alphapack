@@ -43,7 +43,7 @@ void InferenceQueue::run() noexcept {
       std::memcpy(result.first.data(), priors_ptr, sizeof(float) * State::action_count);
       priors_ptr += State::action_count;
 
-      result.second = values_ptr[0];
+      result.second = values_ptr[i];
       promises[i].set_value(std::move(result));
     }
   }
