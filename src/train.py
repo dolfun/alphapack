@@ -59,12 +59,12 @@ def train_policy_value_network(model, episodes, device):
   dataloader = DataLoader(dataset, batch_size=2048, shuffle=True)
   print(f'{len(dataset)} samples loaded!')
 
-  epochs = 16
-  lr = 0.02
+  epochs = 32
+  lr = 0.1
   value_loss_scale_factor = 1.5
 
   model.train()
-  optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5)
+  optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
   train_log_file = open('train_log.csv', 'a')
   for epoch in range(epochs):
     epoch_loss = 0.0

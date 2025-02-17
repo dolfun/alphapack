@@ -1,13 +1,13 @@
 #include "generate_init_states.h"
 #include <random>
 
-auto generate_random_init_states(uint32_t seed, size_t count, int min_item_dim, int max_item_dim)
+auto generate_random_init_states(uint32_t seed, int pool_size, int min_item_dim, int max_item_dim)
     -> std::vector<State> {
 
   std::mt19937 engine { seed };
   std::vector<State> states;
-  states.reserve(count);
-  for (int i = 0; i < count; ++i) {
+  states.reserve(pool_size);
+  for (int i = 0; i < pool_size; ++i) {
     std::uniform_int_distribution<int> dist { min_item_dim, max_item_dim };
     std::vector<Item> items(State::item_count);
     for (auto& item : items) {
@@ -40,12 +40,38 @@ public:
       min_packing_efficiency { _min_packing_efficiency },
       max_packing_efficiency { _max_packing_efficiency } {}
 
-  auto generate(size_t count) -> std::vector<State> {
+  auto generate(int pool_size, int count) -> std::vector<State> {
+    std::vector<std::vector<PlacedItem>> items_pool(pool_size);
+    std::ranges::generate(items_pool, [this] { return generate_items(); });
+
+    std::random_device rd{};
+    std::mt19937 engine { rd() };
+    std::uniform_int_distribution<int> idx_dist { 0, pool_size - 1 };
+    std::uniform_real_distribution<float> pe_dist { min_packing_efficiency, max_packing_efficiency };
+
     std::vector<State> states;
     states.reserve(count);
     for (size_t i = 0; i < count; ++i) {
-      states.emplace_back(generate_state());
+      auto placed_items = items_pool[idx_dist(engine)];
+      std::vector<Item> items(State::item_count, Item { .shape = {}, .placed = true });
+      for (size_t i = 0; i < std::min(items.size(), placed_items.size()); ++i) {
+        items[i].shape = placed_items[i].shape;
+        items[i].placed = false;
+      }
+
+      State state { items };
+      float expected_packing_efficiency = pe_dist(engine);
+      for (auto item : placed_items) {
+        if (state.packing_efficiency() >= expected_packing_efficiency) break;
+        if (state.possible_actions().empty()) break;
+
+        int action_idx = item.pos.x * State::bin_length + item.pos.y;
+        (void)state.transition(action_idx);
+      }
+
+      states.emplace_back(std::move(state));
     }
+
     return states;
   }
 
@@ -74,11 +100,11 @@ private:
     return { item1, item2 };
   }
 
-  auto generate_state() -> State {
+  auto generate_items() -> std::vector<PlacedItem> {
     std::vector<PlacedItem> invalid_items, valid_items;
 
     invalid_items.emplace_back(
-      Vec3i { State::bin_length, State::bin_length, State::bin_height }, 
+      Vec3i { State::bin_length, State::bin_length, State::bin_height },
       Vec3i { 0, 0, 0 }
     );
 
@@ -104,6 +130,7 @@ private:
           invalid_items.emplace_back(item);
         }
       };
+
       insert_item(item1);
       insert_item(item2);
     }
@@ -112,32 +139,7 @@ private:
       return std::make_tuple(item.pos.z, item.pos.x, item.pos.y);
     });
 
-    Item default_item {
-      .shape = {},
-      .placed = true
-    };
-
-    std::vector<Item> items(State::item_count, default_item);
-    for (size_t i = 0; i < std::min(items.size(), valid_items.size()); ++i) {
-      items[i].shape = valid_items[i].shape;
-      items[i].placed = false;
-    }
-
-    static std::random_device rd{};
-    static std::mt19937 engine { rd() };
-    std::uniform_real_distribution<float> dist { min_packing_efficiency, max_packing_efficiency };
-    float expected_packing_efficiency = dist(engine);
-
-    State state { items };
-    for (auto item : valid_items) {
-      if (state.packing_efficiency() >= expected_packing_efficiency) break;
-      if (state.possible_actions().empty()) break;
-
-      int action_idx = item.pos.x * State::bin_length + item.pos.y;
-      (void)state.transition(action_idx);
-    }
-
-    return state;
+    return valid_items;
   }
 
   std::mt19937 engine;
@@ -147,13 +149,14 @@ private:
 
 auto generate_cut_init_states(
   std::uint32_t seed,
-  size_t count,
+  int pool_size,
   int min_item_dim,
   int max_item_dim,
   float min_packing_efficiency,
-  float max_packing_efficiency)
+  float max_packing_efficiency,
+  int count)
     -> std::vector<State> {
 
   CutStateGenerator generator { seed, min_item_dim, max_item_dim, min_packing_efficiency, max_packing_efficiency };
-  return generator.generate(count);
+  return generator.generate(pool_size, count);
 }

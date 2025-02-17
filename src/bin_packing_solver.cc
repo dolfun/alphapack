@@ -86,7 +86,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     "generate_random_init_states",
     &generate_random_init_states,
     py::arg("seed"),
-    py::arg("count"),
+    py::arg("pool_size"),
     py::arg("min_item_dim"),
     py::arg("max_item_dim")
   );
@@ -95,11 +95,12 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     "generate_cut_init_states",
     &generate_cut_init_states,
     py::arg("seed"),
-    py::arg("count"),
+    py::arg("pool_size"),
     py::arg("min_item_dim"),
     py::arg("max_item_dim"),
     py::arg("min_packing_efficiency"),
-    py::arg("max_packing_efficiency")
+    py::arg("max_packing_efficiency"),
+    py::arg("count")
   );
 
   // generate_episodes

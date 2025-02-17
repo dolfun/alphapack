@@ -6,7 +6,6 @@ import bin_packing_solver as bps
 
 from dataclasses import dataclass
 import argparse
-import random
 import pickle
 import torch
 import os
@@ -43,7 +42,7 @@ def perform_iteration(
 
   # Simulate Games
   print('SIMULATING GAMES:')
-  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.70, 0.80)
+  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 1.0, 4096)
   episodes = generate_episodes(init_states, config, model_path, device)
   with open(f'checkpoints/episodes{idx}.bin', 'wb') as file:
     pickle.dump(episodes, file)
@@ -73,11 +72,11 @@ def main():
     episodes_per_iteration=1152,
     processes=6,
     step_size=96,
-    workers_per_process=16,
+    workers_per_process=32,
     move_threshold=4,
-    simulations_per_move=1024,
+    simulations_per_move=512,
     mcts_thread_count=8,
-    batch_size=32,
+    batch_size=64,
     c_puct=1.25,
     virtual_loss=1,
     alpha=0.3
