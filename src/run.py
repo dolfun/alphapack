@@ -73,13 +73,13 @@ def main():
     processes=6,
     step_size=96,
     workers_per_process=32,
-    move_threshold=4,
+    move_threshold=0,
     simulations_per_move=512,
     mcts_thread_count=8,
     batch_size=64,
-    c_puct=1.25,
+    c_puct=1.1,
     virtual_loss=1,
-    alpha=0.3
+    alpha=0.15
   )
 
   # Create model if does not exist

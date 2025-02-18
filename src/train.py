@@ -35,16 +35,12 @@ def prepare_samples(episodes):
   return samples
 
 class ExperienceReplay(Dataset):
-  def __init__(self, samples, augment=False):
-    self.samples = samples
-    if augment:
-      self.samples = [
-        augmented_sample
-        for sample in self.samples
-        for augmented_sample in augment_sample(sample)
-      ]
-
-    self.samples = [sample[:-1] for sample in self.samples]
+  def __init__(self, samples):
+    self.samples = [
+      augmented_sample[:-1]
+      for sample in samples
+      for augmented_sample in augment_sample(sample)
+    ]
 
   def __len__(self):
     return len(self.samples)
@@ -55,16 +51,16 @@ class ExperienceReplay(Dataset):
 step_count = 0
 def train_policy_value_network(model, episodes, device):
   samples = prepare_samples(episodes)
-  dataset = ExperienceReplay(samples, augment=True)
-  dataloader = DataLoader(dataset, batch_size=2048, shuffle=True)
-  print(f'{len(dataset)} samples loaded!')
+  experience_replay = ExperienceReplay(samples)
+  dataloader = DataLoader(experience_replay, batch_size=2048, shuffle=True)
+  print(f'{len(experience_replay)} samples loaded!')
 
-  epochs = 32
-  lr = 0.1
-  value_loss_scale_factor = 1.5
+  epochs = 8
+  lr = 1e-2
+  weight_decay = 1e-4
 
   model.train()
-  optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+  optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
   train_log_file = open('train_log.csv', 'a')
   for epoch in range(epochs):
     epoch_loss = 0.0
@@ -74,23 +70,23 @@ def train_policy_value_network(model, episodes, device):
       inputs = (tensor.to(device) for tensor in list(inputs))
       image_data, additional_data, priors, value = inputs
 
-      predicted_priors, predicted_value = model(image_data, additional_data)
-      priors_loss = F.cross_entropy(predicted_priors, priors)
-      value_loss = value_loss_scale_factor * F.cross_entropy(predicted_value, value)
-      loss = priors_loss + value_loss
+      pred_priors, pred_value = model(image_data, additional_data)
+      priors_loss = F.cross_entropy(pred_priors, priors)
+      value_loss = F.cross_entropy(pred_value, value)
+      total_loss = priors_loss + value_loss
 
       optimizer.zero_grad()
-      loss.backward()
+      total_loss.backward()
       optimizer.step()
 
-      epoch_loss += loss.item()
+      epoch_loss += total_loss.item()
       epoch_priors_loss += priors_loss.item()
       epoch_value_loss += value_loss.item()
 
       global step_count
       step_count += 1
       train_log_file.write(f'{step_count}')
-      train_log_file.write(f',{loss.item():.4f},{priors_loss.item():.4f},{value_loss.item():.4f}\n')
+      train_log_file.write(f',{total_loss.item():.4f},{priors_loss.item():.4f},{value_loss.item():.4f}\n')
 
     epoch_loss /= len(dataloader)
     epoch_priors_loss /= len(dataloader)
