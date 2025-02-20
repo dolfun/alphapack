@@ -71,8 +71,10 @@ def train_policy_value_network(model, episodes, device):
       image_data, additional_data, priors, value = inputs
 
       pred_priors, pred_value = model(image_data, additional_data)
-      priors_loss = F.cross_entropy(pred_priors, priors)
-      value_loss = F.cross_entropy(pred_value, value)
+      pred_priors = F.log_softmax(pred_priors, dim=1)
+      pred_value = F.log_softmax(pred_value, dim=1)
+      priors_loss = F.kl_div(pred_priors, priors, reduction='batchmean')
+      value_loss = F.kl_div(pred_value, value, reduction='batchmean')
       total_loss = priors_loss + value_loss
 
       optimizer.zero_grad()
