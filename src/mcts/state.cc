@@ -91,18 +91,18 @@ auto State::normalized_items() const noexcept -> std::vector<float> {
   std::vector<float> data(item_count * values_per_item);
   auto it = data.begin();
   for (const auto& item : m_items) {
-    if (!item.placed) {
-      float x = static_cast<float>(item.shape.x) / bin_length;
-      float y = static_cast<float>(item.shape.y) / bin_length;
-      float z = static_cast<float>(item.shape.z) / bin_height;
+    float x = static_cast<float>(item.shape.x) / bin_length;
+    float y = static_cast<float>(item.shape.y) / bin_length;
+    float z = static_cast<float>(item.shape.z) / bin_height;
 
-      it[0] = x;
-      it[1] = y;
-      it[2] = z;
-    }
+    it[0] = x;
+    it[1] = y;
+    it[2] = z;
+    it[3] = (item.placed ? 1.0f : 0.0f);
 
     it += values_per_item;
   }
+
   return data;
 }
 

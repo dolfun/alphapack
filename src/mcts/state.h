@@ -28,7 +28,7 @@ public:
   static constexpr int bin_height = 10;
   static constexpr int action_count = bin_length * bin_length;
   static constexpr int item_count = 64;
-  static constexpr int values_per_item = 3;
+  static constexpr int values_per_item = 4;
   static constexpr int value_support_count = 101;
 
 private:
