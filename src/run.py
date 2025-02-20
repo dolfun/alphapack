@@ -68,7 +68,7 @@ def main():
 
   config = Config(
     seed=23894734,
-    pool_size=2048,
+    pool_size=256,
     episodes_per_iteration=1152,
     processes=6,
     step_size=96,
@@ -77,9 +77,9 @@ def main():
     simulations_per_move=512,
     mcts_thread_count=8,
     batch_size=64,
-    c_puct=1.1,
+    c_puct=1.25,
     virtual_loss=1,
-    alpha=0.15
+    alpha=0.3
   )
 
   # Create model if does not exist
