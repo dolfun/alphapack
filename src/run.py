@@ -1,8 +1,7 @@
+from bin_packing_solver import generate_cut_init_states
 from policy_value_network import PolicyValueNetwork
 from train import train_policy_value_network
 from generate import generate_episodes
-from bin_packing_solver import State
-import bin_packing_solver as bps
 
 from dataclasses import dataclass
 import argparse
@@ -42,7 +41,7 @@ def perform_iteration(
 
   # Simulate Games
   print('SIMULATING GAMES:')
-  init_states = bps.generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 1.0, 4096)
+  init_states = generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 1.0, 4096)
   episodes = generate_episodes(init_states, config, model_path, device)
   with open(f'checkpoints/episodes{idx}.bin', 'wb') as file:
     pickle.dump(episodes, file)

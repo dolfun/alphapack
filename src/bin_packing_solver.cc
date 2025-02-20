@@ -20,6 +20,7 @@ py::buffer_info array_2d_buffer_info(Array2D<T>& arr) {
 PYBIND11_MODULE(bin_packing_solver, m) {
   // glm::vec3
   py::class_<Vec3i>(m, "Vec3i")
+    .def(py::init<int, int, int>(), py::arg("x"), py::arg("y"), py::arg("z"))
     .def_readwrite("x", &Vec3i::x)
     .def_readwrite("y", &Vec3i::y)
     .def_readwrite("z", &Vec3i::z);
