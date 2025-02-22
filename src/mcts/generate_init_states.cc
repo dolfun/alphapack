@@ -15,6 +15,7 @@ auto generate_random_init_states(uint32_t seed, int pool_size, int min_item_dim,
       item.shape.y = dist(engine);
       item.shape.z = dist(engine);
     }
+
     states.emplace_back(items);
   }
 

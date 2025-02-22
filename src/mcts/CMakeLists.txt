@@ -23,7 +23,7 @@ add_library(
   generate_episode.cc
 )
 
-target_compile_features(mcts PRIVATE cxx_std_20)
+target_compile_features(mcts PRIVATE cxx_std_23)
 target_link_libraries(mcts PRIVATE pybind11::pybind11)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")

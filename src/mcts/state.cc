@@ -1,12 +1,12 @@
 #include "state.h"
 #include <cstring>
 #include <algorithm>
+#include <stdexcept>
 
-template <typename T>
+template <typename T, size_t N>
 class SingleUseMaxQueue {
 public:
-  constexpr SingleUseMaxQueue(size_t size)
-    : m_data(size), it_front { m_data.begin() }, it_back { m_data.begin() } {}
+  constexpr SingleUseMaxQueue() : it_front { m_data.begin() }, it_back { m_data.begin() } {}
 
   constexpr T max() const noexcept {
     return *it_front;
@@ -26,50 +26,63 @@ public:
   }
 
 private:
-  std::vector<T> m_data;
-  std::vector<T>::iterator it_front, it_back;
+  std::array<T, N> m_data;
+  std::array<T, N>::iterator it_front, it_back;
 };
 
-template <typename T>
-auto get_max_in_window(const Array2D<T>& arr, int length, int width) -> Array2D<T> {
-  size_t n_arr = arr.rows(), m_arr = arr.cols();
-
-  Array2D<T> res { n_arr, m_arr };
-  for (size_t x = 0; x < n_arr; ++x) {
-    SingleUseMaxQueue<T> max_queue { m_arr };
+template <typename T, size_t N, size_t M>
+auto get_max_in_window(const Array2D<T, N, M>& arr, int length, int width) -> State::Array2D<T> {
+  State::Array2D<T> res{};
+  for (size_t x = 0; x < N; ++x) {
+    SingleUseMaxQueue<T, M> max_queue{};
     for (int y = 0; y < width; ++y) {
-      max_queue.insert(arr(x, y));
+      max_queue.insert(arr[x, y]);
     }
 
-    for (size_t y = 0; y < m_arr - width; ++y) {
-      res(x, y) = max_queue.max();
-      max_queue.remove(arr(x, y));
-      max_queue.insert(arr(x, y + width));
+    for (size_t y = 0; y < M - width; ++y) {
+      res[x, y] = max_queue.max();
+      max_queue.remove(arr[x, y]);
+      max_queue.insert(arr[x, y + width]);
     }
 
-    res(x, m_arr - width) = max_queue.max();
+    res[x, M - width] = max_queue.max();
   }
 
-  for (size_t y = 0; y <= m_arr - width; ++y) {
-    SingleUseMaxQueue<T> max_queue { n_arr };
+  for (size_t y = 0; y <= M - width; ++y) {
+    SingleUseMaxQueue<T, N> max_queue{};
     for (int x = 0; x < length; ++x) {
-      max_queue.insert(res(x, y));
+      max_queue.insert(res[x, y]);
     }
 
-    for (size_t x = 0; x < n_arr - length; ++x) {
-      T item_to_remove = res(x, y);
-      res(x, y) = max_queue.max();
+    for (size_t x = 0; x < N - length; ++x) {
+      T item_to_remove = res[x, y];
+      res[x, y] = max_queue.max();
       max_queue.remove(item_to_remove);
-      max_queue.insert(res(x + length, y));
+      max_queue.insert(res[x + length, y]);
     }
 
-    res(n_arr - length, y) = max_queue.max();
+    res[N - length, y] = max_queue.max();
   }
 
   return res;
 }
 
-auto State::items() const noexcept -> const std::vector<Item>& {
+State::State(const std::vector<Item>& items)
+    : m_feasibility_info { create_feasibility_info(items.front()) } {
+
+  if (items.size() != item_count) {
+    throw std::runtime_error("Invalid number of items received!");
+  }
+
+  std::copy(items.begin(), items.end(), m_items.begin());
+}
+
+State::State(std::array<Item, item_count>&& items, Array2D<int8_t>&& height_map, Array2D<int8_t>&& feasibility_info)
+  : m_items { std::move(items) },
+    m_height_map { std::move(height_map) },
+    m_feasibility_info { std::move(feasibility_info) } {}
+
+auto State::items() const noexcept -> const std::array<Item, item_count>& {
   return m_items;
 }
 
@@ -78,10 +91,10 @@ auto State::height_map() const noexcept -> const Array2D<int8_t>& {
 }
 
 auto State::feasibility_mask() const noexcept -> Array2D<int8_t> {
-  Array2D<int8_t> mask { m_feasibility_info.rows(), m_feasibility_info.cols() };
+  State::Array2D<int8_t> mask{};
   for (size_t x = 0; x < mask.rows(); ++x) {
     for (size_t y = 0; y < mask.cols(); ++y) {
-      mask(x, y) = (m_feasibility_info(x, y) >= 0);
+      mask[x, y] = (m_feasibility_info[x, y] >= 0);
     }
   }
   return mask;
@@ -124,7 +137,7 @@ auto State::possible_actions() const -> std::vector<int> {
   std::vector<int> actions;
   for (int x = 0; x < m_feasibility_info.rows(); ++x) {
     for (int y = 0; y < m_feasibility_info.cols(); ++y) {
-      if (m_feasibility_info(x, y) >= 0) {
+      if (m_feasibility_info[x, y] >= 0) {
         actions.push_back(x * State::bin_length + y);
       }
     }
@@ -141,7 +154,7 @@ float State::transition(int action_idx) {
   int x0 = action_idx / bin_length, y0 = action_idx % bin_length;
   for (int x = x0; x < x0 + current_item.shape.x; ++x) {
     for (int y = y0; y < y0 + current_item.shape.y; ++y) {
-      m_height_map(x, y) = m_feasibility_info(x0, y0) + current_item.shape.z;
+      m_height_map[x, y] = m_feasibility_info[x0, y0] + current_item.shape.z;
     }
   }
 
@@ -179,9 +192,8 @@ auto State::serialize(const State& state) -> std::string {
 }
 
 State State::unserialize(const std::string& bytes) {
-  std::vector<Item> items(item_count);
-  Array2D<int8_t> height_map(bin_length, bin_length);
-  Array2D<int8_t> feasibility_info(bin_length, bin_length);
+  std::array<Item, item_count> items{};
+  Array2D<int8_t> height_map{}, feasibility_info{};
 
   std::pair<void*, size_t> infos[3] = {
     { items.data(), sizeof(Item) * item_count },
@@ -199,17 +211,18 @@ State State::unserialize(const std::string& bytes) {
 }
 
 auto State::create_feasibility_info(const Item& item) const noexcept -> Array2D<int8_t> {
-  Array2D<int8_t> info { bin_length, bin_length, -1 };
+  Array2D<int8_t> info { -1 };
   if (item.placed) return info;
 
   auto max_height_arr = get_max_in_window(m_height_map, item.shape.x, item.shape.y);
   for (size_t x = 0; x <= info.rows() - item.shape.x; ++x) {
     for (size_t y = 0; y <= info.cols() - item.shape.y; ++y) {
-      int max_height = max_height_arr(x, y);
+      int max_height = max_height_arr[x, y];
       if (max_height + item.shape.z > bin_height) continue;
-      info(x, y) = max_height;
+      info[x, y] = max_height;
     }
   }
+
   return info;
 }
 
@@ -236,20 +249,20 @@ auto get_state_symmetry(const State& state, int k) noexcept -> State {
   }
 
   constexpr int L = State::bin_length;
-  Array2D<int8_t> height_map { L, L };
+  State::Array2D<int8_t> height_map{};
   for (int x = 0; x < L; ++x) {
     for (int y = 0; y < L; ++y) {
       auto [x1, y1] = symmetry_transforms[k](x, y, 1, 1, L);
-      height_map(x1, y1) = state.m_height_map(x, y);
+      height_map[x1, y1] = state.m_height_map[x, y];
     }
   }
 
-  Array2D<int8_t> feasibility_info { L, L, -1 };
+  State::Array2D<int8_t> feasibility_info { -1 };
   if (!current_item.placed) {
     for (int x = 0; x <= L - l; ++x) {
       for (int y = 0; y <= L - w; ++y) {
         auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);
-        feasibility_info(x1, y1) = state.m_feasibility_info(x, y);
+        feasibility_info[x1, y1] = state.m_feasibility_info[x, y];
       }
     }
   }

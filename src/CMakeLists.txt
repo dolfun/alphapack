@@ -9,7 +9,7 @@ pybind11_add_module(
   bin_packing_solver.cc
 )
 
-target_compile_features(bin_packing_solver PUBLIC cxx_std_20)
+target_compile_features(bin_packing_solver PUBLIC cxx_std_23)
 target_link_libraries(bin_packing_solver PUBLIC mcts)
 
 set(MODULE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/src)

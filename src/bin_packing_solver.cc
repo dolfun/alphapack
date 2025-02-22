@@ -6,7 +6,7 @@
 namespace py = pybind11;
 
 template <typename T>
-py::buffer_info array_2d_buffer_info(Array2D<T>& arr) {
+py::buffer_info array_2d_buffer_info(State::Array2D<T>& arr) {
   py::buffer_info info{};
   info.ptr = static_cast<void*>(arr.data());
   info.itemsize = sizeof(T);
@@ -32,7 +32,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readwrite("placed", &Item::placed);
 
   // Array2D
-  py::class_<Array2D<int8_t>>(m, "Array2Di", py::buffer_protocol())
+  py::class_<State::Array2D<int8_t>>(m, "Array2Di", py::buffer_protocol())
     .def_buffer(array_2d_buffer_info<int8_t>);
   
   // State

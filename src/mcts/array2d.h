@@ -1,38 +1,29 @@
 #pragma once
-#include <vector>
-#include <utility>
+#include <array>
 
-template <typename T>
+template <typename T, size_t N, size_t M>
 class Array2D {
 public:
-  Array2D(size_t rows, size_t cols, T val = {})
-    : m_rows { rows }, m_cols { cols }, m_data(m_rows * m_cols, val) {}
+  Array2D(T val = {}) { m_data.fill(val); }
 
-  const T& operator() (size_t i, size_t j) const noexcept {
-    return m_data[i * m_cols + j];
+  template <typename Self>
+  auto& operator[] (this Self&& self, size_t i, size_t j) noexcept {
+    return self.m_data[i * M + j];
   }
 
-  T& operator() (size_t i, size_t j) noexcept {
-    return const_cast<T&>(std::as_const(*this).operator()(i, j));
+  constexpr size_t rows() const noexcept {
+    return N;
   }
 
-  size_t rows() const noexcept {
-    return m_rows;
+  constexpr size_t cols() const noexcept {
+    return M;
   }
 
-  size_t cols() const noexcept {
-    return m_cols;
-  }
-
-  const T* data() const noexcept {
-    return m_data.data();
-  }
-
-  T* data() noexcept {
-    return const_cast<T*>(std::as_const(*this).data());
+  template <typename Self>
+  auto data(this Self&& self) noexcept {
+    return self.m_data.data();
   }
 
 private:
-  size_t m_rows, m_cols;
-  std::vector<T> m_data;
+  std::array<T, N * M> m_data;
 };
