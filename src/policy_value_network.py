@@ -79,11 +79,10 @@ class ValueHead(nn.Module):
     return x_out
 
 class PolicyValueNetwork(nn.Module):
-  def __init__(self, nr_input_features=2, nr_residual_blocks=6, nr_channels=64):
+  def __init__(self, nr_residual_blocks=6, nr_channels=64):
     super().__init__()
 
-    additional_input_size = State.item_count * State.values_per_item
-    self.trunk = Trunk(nr_input_features, additional_input_size, nr_residual_blocks, nr_channels)
+    self.trunk = Trunk(State.input_feature_count, State.additional_input_count, nr_residual_blocks, nr_channels)
     self.policy_head = PolicyHead(nr_channels, 2, State.bin_length)
     self.value_head = ValueHead(nr_channels, 2, State.value_support_count, State.bin_length)
 

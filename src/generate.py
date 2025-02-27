@@ -1,5 +1,5 @@
 from policy_value_network import PolicyValueNetwork
-from bin_packing_solver import State
+from bin_packing_solver import InferInput
 import bin_packing_solver
 
 import torch.multiprocessing as mp
@@ -33,24 +33,13 @@ def init_worker(_init_states, _config, _model_path, _device):
   model.eval()
 
 @torch.no_grad()
-def infer(states):
+def infer(inputs: list[InferInput]):
   global init_states, model, device
 
-  image_data = [
-    np.stack([
-      np.array(state.height_map, dtype=np.float32) / State.bin_height,
-      np.array(state.feasibility_mask, dtype=np.float32)
-    ])
-    for state in states
-  ]
-
-  additional_data = [
-    np.array(state.normalized_items, dtype=np.float32)
-    for state in states
-  ]
-
-  image_data = torch.tensor(np.stack(image_data), device=device)
-  additional_data = torch.tensor(np.stack(additional_data), device=device)
+  image_data = np.stack([input.image_data for input in inputs], dtype=np.float32)
+  additional_data = np.stack([input.additional_data for input in inputs], dtype=np.float32)
+  image_data = torch.tensor(image_data, device=device)
+  additional_data = torch.tensor(additional_data, device=device)
   priors, value = model.forward(image_data, additional_data)
   result = (priors.cpu().numpy(), value.cpu().numpy())
   return result

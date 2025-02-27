@@ -1,14 +1,14 @@
 #pragma once
 #include <array>
 
-template <typename T, size_t N, size_t M>
-class Array2D {
+template <typename T, size_t C, size_t N, size_t M>
+class Array3D {
 public:
-  Array2D(T val = {}) { m_data.fill(val); }
+  Array3D(T val = {}) { m_data.fill(val); }
 
   template <typename Self>
-  auto& operator[] (this Self&& self, size_t i, size_t j) noexcept {
-    return self.m_data[i * M + j];
+  auto& operator[] (this Self&& self, size_t i, size_t j, size_t k) noexcept {
+    return self.m_data[i * N * M + j * M + k];
   }
 
   constexpr size_t size() const noexcept {
@@ -18,8 +18,10 @@ public:
   template <size_t D>
   constexpr size_t size() const noexcept {
     if constexpr (D == 0) {
-      return N;
+      return C;
     } else if constexpr (D == 1) {
+      return N;
+    } else if constexpr (D == 2) {
       return M;
     } else {
       std::unreachable();
@@ -32,5 +34,5 @@ public:
   }
 
 private:
-  std::array<T, N * M> m_data;
+  std::array<T, C * N * M> m_data;
 };

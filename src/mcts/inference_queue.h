@@ -10,23 +10,20 @@
 
 class InferenceQueue {
 public:
-  using Result = std::pair<
-    std::array<float, State::action_count>, 
-    std::array<float, State::value_support_count>
-  >;
-
+  using Input = std::shared_ptr<State::InferInput>;
+  using Result = std::unique_ptr<State::InferResult>;
   using InferFunc = std::function<
-    std::pair<pybind11::array_t<float>, pybind11::array_t<float>>(const std::vector<std::shared_ptr<State>>&)
+    std::pair<pybind11::array_t<float>, pybind11::array_t<float>>(const std::vector<Input>&)
   >;
 
   InferenceQueue(size_t _max_batch_size, InferFunc _infer_func)
     : max_batch_size { _max_batch_size }, infer_func { _infer_func } {}
 
-  auto infer(std::shared_ptr<State>) noexcept -> std::future<Result>;
+  auto infer(Input) noexcept -> std::future<Result>;
   void run() noexcept;
 
 private:
-  using Element_t = std::pair<std::shared_ptr<State>, std::promise<Result>>;
+  using Element_t = std::pair<Input, std::promise<Result>>;
 
   size_t max_batch_size;
   InferFunc infer_func;

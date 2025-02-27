@@ -67,8 +67,8 @@ bool run_mcts_simulation(
   thread_local static std::uniform_int_distribution<int> symmetry_dist(0, 7);
 
   int symmetry_idx = symmetry_dist(engine);
-  auto transformed_state = get_state_symmetry(*leaf_node->state, symmetry_idx);
-  auto inference_result = inference_queue.infer(std::make_shared<State>(std::move(transformed_state)));
+  auto inference_input = leaf_node->state->inference_input(symmetry_idx);
+  auto inference_result_future = inference_queue.infer(inference_input);
 
   // Expansion
   auto actions = leaf_node->state->possible_actions();
@@ -81,7 +81,7 @@ bool run_mcts_simulation(
   }
 
   // Waiting for evaluation result
-  auto [transformed_priors, value_supports] = inference_result.get();
+  auto inference_result = inference_result_future.get();
 
   // Applying softmax
   auto apply_softmax = [] (auto& arr) {
@@ -97,17 +97,17 @@ bool run_mcts_simulation(
     }
   };
 
-  apply_softmax(transformed_priors);
-  apply_softmax(value_supports);
+  apply_softmax(inference_result->priors);
+  apply_softmax(inference_result->value);
 
   // Extract value from supports
   float value = 0.0f;
   for (int i = 0; i < State::value_support_count; ++i) {
-    value += value_supports[i] * i / (State::value_support_count - 1); 
+    value += inference_result->value[i] * i / (State::value_support_count - 1);
   }
 
   // Apply innverse dihedral transform
-  auto priors = get_inverse_priors_symmetry(*leaf_node->state, transformed_priors, symmetry_idx);
+  auto priors = leaf_node->state->invert_symmetric_transform(inference_result->priors, symmetry_idx);
 
   float total_valid_prior = 0.0f;
   for (auto action_idx : actions) {

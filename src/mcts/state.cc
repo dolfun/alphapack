@@ -77,11 +77,6 @@ State::State(const std::vector<Item>& items)
   std::copy(items.begin(), items.end(), m_items.begin());
 }
 
-State::State(std::array<Item, item_count>&& items, Array2D<int8_t>&& height_map, Array2D<int8_t>&& feasibility_info)
-  : m_items { std::move(items) },
-    m_height_map { std::move(height_map) },
-    m_feasibility_info { std::move(feasibility_info) } {}
-
 auto State::items() const noexcept -> const std::array<Item, item_count>& {
   return m_items;
 }
@@ -92,31 +87,12 @@ auto State::height_map() const noexcept -> const Array2D<int8_t>& {
 
 auto State::feasibility_mask() const noexcept -> Array2D<int8_t> {
   State::Array2D<int8_t> mask{};
-  for (size_t x = 0; x < mask.rows(); ++x) {
-    for (size_t y = 0; y < mask.cols(); ++y) {
+  for (size_t x = 0; x < mask.size<0>(); ++x) {
+    for (size_t y = 0; y < mask.size<1>(); ++y) {
       mask[x, y] = (m_feasibility_info[x, y] >= 0);
     }
   }
   return mask;
-}
-
-auto State::normalized_items() const noexcept -> std::vector<float> {
-  std::vector<float> data(item_count * values_per_item);
-  auto it = data.begin();
-  for (const auto& item : m_items) {
-    float x = static_cast<float>(item.shape.x) / bin_length;
-    float y = static_cast<float>(item.shape.y) / bin_length;
-    float z = static_cast<float>(item.shape.z) / bin_height;
-
-    it[0] = x;
-    it[1] = y;
-    it[2] = z;
-    it[3] = (item.placed ? 1.0f : 0.0f);
-
-    it += values_per_item;
-  }
-
-  return data;
 }
 
 float State::packing_efficiency() const noexcept {
@@ -135,8 +111,8 @@ auto State::possible_actions() const -> std::vector<int> {
   if (m_items.front().placed) return {};
 
   std::vector<int> actions;
-  for (int x = 0; x < m_feasibility_info.rows(); ++x) {
-    for (int y = 0; y < m_feasibility_info.cols(); ++y) {
+  for (int x = 0; x < m_feasibility_info.size<0>(); ++x) {
+    for (int y = 0; y < m_feasibility_info.size<1>(); ++y) {
       if (m_feasibility_info[x, y] >= 0) {
         actions.push_back(x * State::bin_length + y);
       }
@@ -173,8 +149,8 @@ float State::transition(int action_idx) {
 auto State::serialize(const State& state) -> std::string {
   std::pair<const void*, size_t> infos[3] = {
     { state.m_items.data(), sizeof(Item) * item_count },
-    { state.m_height_map.data(), sizeof(int8_t) * bin_length * bin_length },
-    { state.m_feasibility_info.data(), sizeof(int8_t) * bin_length * bin_length }
+    { state.m_height_map.data(), sizeof(int8_t) * state.m_height_map.size() },
+    { state.m_feasibility_info.data(), sizeof(int8_t) * state.m_feasibility_info.size() }
   };
 
   size_t total_size = 0;
@@ -197,8 +173,8 @@ State State::unserialize(const std::string& bytes) {
 
   std::pair<void*, size_t> infos[3] = {
     { items.data(), sizeof(Item) * item_count },
-    { height_map.data(), sizeof(int8_t) * bin_length * bin_length },
-    { feasibility_info.data(), sizeof(int8_t) * bin_length * bin_length }
+    { height_map.data(), sizeof(int8_t) * height_map.size() },
+    { feasibility_info.data(), sizeof(int8_t) * feasibility_info.size() }
   };
 
   const char* src = &bytes[0];
@@ -210,87 +186,94 @@ State State::unserialize(const std::string& bytes) {
   return State(std::move(items), std::move(height_map), std::move(feasibility_info));
 }
 
-auto State::create_feasibility_info(const Item& item) const noexcept -> Array2D<int8_t> {
-  Array2D<int8_t> info { -1 };
-  if (item.placed) return info;
+State::State(
+  const std::array<Item, item_count>& items,
+  const Array2D<int8_t>& height_map,
+  const Array2D<int8_t>& feasibility_info)
+  : m_items { items },
+    m_height_map { height_map },
+    m_feasibility_info { feasibility_info } {}
 
-  auto max_height_arr = get_max_in_window(m_height_map, item.shape.x, item.shape.y);
-  for (size_t x = 0; x <= info.rows() - item.shape.x; ++x) {
-    for (size_t y = 0; y <= info.cols() - item.shape.y; ++y) {
-      int max_height = max_height_arr[x, y];
-      if (max_height + item.shape.z > bin_height) continue;
-      info[x, y] = max_height;
-    }
+auto State::get_additional_data(bool swap) const noexcept
+    -> std::array<float, additional_input_count> {
+
+  std::array<float, additional_input_count> data;
+  auto it = data.begin();
+  for (auto item : m_items) {
+    float x = static_cast<float>(item.shape.x) / bin_length;
+    float y = static_cast<float>(item.shape.y) / bin_length;
+    float z = static_cast<float>(item.shape.z) / bin_height;
+
+    if (swap) std::swap(x, y);
+
+    it[0] = x;
+    it[1] = y;
+    it[2] = z;
+    it[3] = (item.placed ? 1.0f : 0.0f);
+
+    it += 4;
   }
 
-  return info;
+  return data;
 }
 
-constexpr std::pair<int, int> (*symmetry_transforms[8])(int, int, int, int, int) = {
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(x        , y        ); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, x        ); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, L - y - w); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(y        , L - x - l); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, y        ); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, L - x - l); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(x        , L - y - w); },
-  [] (int x, int y, int l, int w, int L) { return std::make_pair(y        , x        ); },
-};
+auto State::inference_input(int k) const noexcept -> std::shared_ptr<InferInput> {
+  auto inference_input = std::make_shared<InferInput>();
+  inference_input->additional_data = get_additional_data(k & 1);
 
-auto get_state_symmetry(const State& state, int k) noexcept -> State {
-  auto items = state.m_items;
-  Item current_item = items.front();
+  auto current_item = m_items.front();
   int l = current_item.shape.x, w = current_item.shape.y;
-
-  if (k % 2 == 1) {
-    for (auto& item : items) {
-      std::swap(item.shape.x, item.shape.y);
-    }
-  }
-
   constexpr int L = State::bin_length;
-  State::Array2D<int8_t> height_map{};
   for (int x = 0; x < L; ++x) {
     for (int y = 0; y < L; ++y) {
-      auto [x1, y1] = symmetry_transforms[k](x, y, 1, 1, L);
-      height_map[x1, y1] = state.m_height_map[x, y];
-    }
-  }
+      auto [x1, y1] = symmetric_transforms[k](x, y, 1, 1, L);
+      inference_input->image_data[0, x1, y1] = static_cast<float>(m_height_map[x, y]) / bin_height;
 
-  State::Array2D<int8_t> feasibility_info { -1 };
-  if (!current_item.placed) {
-    for (int x = 0; x <= L - l; ++x) {
-      for (int y = 0; y <= L - w; ++y) {
-        auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);
-        feasibility_info[x1, y1] = state.m_feasibility_info[x, y];
+      if (!current_item.placed && x <= L - l && y <= L - w) {
+        auto [x2, y2] = symmetric_transforms[k](x, y, l, w, L);
+        inference_input->image_data[1, x2, y2] = static_cast<float>(m_feasibility_info[x, y] >= 0);
       }
     }
   }
 
-  return State(std::move(items), std::move(height_map), std::move(feasibility_info));
-}
+  return inference_input;
+};
 
-auto get_inverse_priors_symmetry(
-  const State& state,
-  const std::array<float, State::action_count>& transformed_priors,
-  int k) noexcept
+auto State::invert_symmetric_transform(const std::array<float, State::action_count>& priors, int k) const noexcept
     -> std::array<float, State::action_count> {
 
-  Item current_item = state.items().front();
+  Item current_item = m_items.front();
   if (current_item.placed) return {}; // !?
 
   constexpr int L = State::bin_length;
   int l = current_item.shape.x, w = current_item.shape.y;
 
-  std::array<float, State::action_count> priors{};
+  std::array<float, State::action_count> inverted_priors{};
   for (int x = 0; x <= L - l; ++x) {
     for (int y = 0; y <= L - w; ++y) {
-      auto [x1, y1] = symmetry_transforms[k](x, y, l, w, L);
+      auto [x1, y1] = symmetric_transforms[k](x, y, l, w, L);
       int idx = x * L + y;
       int idx1 = x1 * L + y1;
-      priors[idx] = transformed_priors[idx1];
+      inverted_priors[idx] = priors[idx1];
     }
   }
 
-  return priors;
+  return inverted_priors;
+}
+
+auto State::create_feasibility_info(const Item& item) const noexcept -> Array2D<int8_t> {
+  Array2D<int8_t> info { -1 };
+  if (item.placed) return info;
+
+  auto max_height_arr = get_max_in_window(m_height_map, item.shape.x, item.shape.y);
+  for (size_t x = 0; x <= info.size<0>() - item.shape.x; ++x) {
+    for (size_t y = 0; y <= info.size<1>() - item.shape.y; ++y) {
+      int max_height = max_height_arr[x, y];
+      if (max_height + item.shape.z <= bin_height) {
+        info[x, y] = max_height;
+      }
+    }
+  }
+
+  return info;
 }

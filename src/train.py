@@ -1,5 +1,4 @@
-from bin_packing_solver import State
-from augment_sample import augment_sample
+from bin_packing_solver import prepare_samples
 from tqdm import tqdm
 
 import numpy as np
@@ -7,39 +6,16 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-def prepare_samples(episodes):
-  samples = []
-  for episode in episodes:
-    for evaluation in episode:
-      state = evaluation.state
-
-      height_map = np.array(state.height_map, dtype=np.float32) / State.bin_height
-      feasibility_mask = np.array(state.feasibility_mask, dtype=np.float32)
-      image_data = np.stack([height_map, feasibility_mask])
-      
-      additional_data = np.array(state.normalized_items, dtype=np.float32)
-
-      priors = np.array(evaluation.priors, dtype=np.float32)
-
-      scaled_reward = evaluation.reward * (State.value_support_count - 1)
-      support_idx = int(np.floor(scaled_reward))
-      support_contribution = support_idx + 1 - scaled_reward
-      value = np.zeros((State.value_support_count), dtype=np.float32)
-      value[support_idx] = support_contribution
-      if support_idx + 1 < State.value_support_count:
-        value[support_idx + 1] = 1 - support_contribution
-
-      current_item_shape = (state.items[0].shape.x, state.items[0].shape.y)
-      samples.append((image_data, additional_data, priors, value, current_item_shape))
-
-  return samples
-
 class ExperienceReplay(Dataset):
   def __init__(self, samples):
     self.samples = [
-      augmented_sample[:-1]
+      (
+        np.array(sample.input.image_data     , dtype=np.float32),
+        np.array(sample.input.additional_data, dtype=np.float32),
+        np.array(sample.priors               , dtype=np.float32),
+        np.array(sample.value                , dtype=np.float32)
+      )
       for sample in samples
-      for augmented_sample in augment_sample(sample)
     ]
 
   def __len__(self):

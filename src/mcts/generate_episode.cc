@@ -94,8 +94,8 @@ auto generate_episode(
 
   float cumulative_reward = 0.0f;
   for (auto& evaluation : std::views::reverse(episode)) {
-    cumulative_reward += evaluation.reward;
-    evaluation.reward = cumulative_reward;
+    cumulative_reward += evaluation.value;
+    evaluation.value = cumulative_reward;
   }
 
   return episode;

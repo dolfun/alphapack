@@ -21,6 +21,8 @@ add_library(
   generate_init_states.cc
   generate_episode.h
   generate_episode.cc
+  training_sample.h
+  training_sample.cc
 )
 
 target_compile_features(mcts PRIVATE cxx_std_23)
