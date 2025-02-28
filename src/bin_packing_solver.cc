@@ -71,7 +71,7 @@ PYBIND11_MODULE(bin_packing_solver, m) {
   // Array3D
   py::class_<State::Array3D<float, State::input_feature_count>>(m, "ImageData", py::buffer_protocol())
     .def_buffer(array_3d_buffer_info<float, State::input_feature_count>);
-  
+
   // State
   py::class_<State>(m, "State")
     .def(py::init<std::vector<Item>>(), py::arg("items"))

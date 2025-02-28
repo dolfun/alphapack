@@ -183,7 +183,7 @@ State State::unserialize(const std::string& bytes) {
     src += size;
   }
 
-  return State(std::move(items), std::move(height_map), std::move(feasibility_info));
+  return State(items, height_map, feasibility_info);
 }
 
 State::State(
