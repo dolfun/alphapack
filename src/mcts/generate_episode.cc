@@ -1,4 +1,5 @@
 #include "generate_episode.h"
+#include "tree_statistics.h"
 #include "mcts.h"
 #include <latch>
 #include <ranges>
@@ -35,17 +36,33 @@ auto generate_episode(
     }
 
     std::atomic<int> simulation_count{};
+    std::atomic<int> success_count{}, terminal_count{}, retry_count{};
     auto task = [&] {
       while (simulation_count < simulations_per_move) {
-        bool success = run_mcts_simulation(
+        auto status = run_mcts_simulation(
           node,
           c_puct,
           virtual_loss,
           -1.0f,
           inference_queue
         );
-        if (success) ++simulation_count;
-        else std::this_thread::sleep_for(std::chrono::microseconds(100)); // !?
+
+        switch (status) {
+          case SimulationStatus::success:
+            ++success_count;
+            ++simulation_count;
+            break;
+
+          case SimulationStatus::terminal:
+            ++terminal_count;
+            ++simulation_count;
+            break;
+
+          case SimulationStatus::retry:
+            ++retry_count;
+            std::this_thread::sleep_for(std::chrono::microseconds(100)); // !?
+            break;
+        };
       }
     };
 
@@ -61,7 +78,7 @@ auto generate_episode(
 
     if (node->children.empty()) break;
 
-    std::vector<float> priors(State::action_count);
+    std::array<float, State::action_count> priors{};
     int max_visit_count = -1;
     std::vector<int> weights;
     weights.reserve(node->children.size());
@@ -86,11 +103,16 @@ auto generate_episode(
       next_node->reward = next_node->state->transition(next_node->action_idx);
     }
 
-    episode.emplace_back(*node->state, next_node->action_idx, priors, next_node->reward);
+    auto tree_statistics = compute_tree_statistics(node);
+    tree_statistics.success_count = success_count;
+    tree_statistics.terminal_count = terminal_count;
+    tree_statistics.retry_count = retry_count;
+
+    episode.emplace_back(*node->state, next_node->action_idx, priors, next_node->reward, tree_statistics);
     node = next_node;
   }
 
-  episode.emplace_back(*node->state, -1, std::vector<float>(State::action_count), 0.0f);
+  episode.emplace_back(*node->state, -1, std::array<float, State::action_count>{}, 0.0f, TreeStatistics{});
 
   float cumulative_reward = 0.0f;
   for (auto& evaluation : std::views::reverse(episode)) {

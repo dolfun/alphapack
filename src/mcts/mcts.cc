@@ -6,7 +6,7 @@
 
 namespace mcts {
 
-bool run_mcts_simulation(
+SimulationStatus run_mcts_simulation(
     NodePtr root,
     float c_puct,
     int virtual_loss,
@@ -27,7 +27,8 @@ bool run_mcts_simulation(
         node->total_action_value.fetch_add(cumulative_reward, std::memory_order_relaxed);
         cumulative_reward += node->reward;
       }
-      return true;
+
+      return SimulationStatus::terminal;
     }
 
     float sqrt_parent_visit_count = std::sqrt(current_node->visit_count.load(std::memory_order_relaxed));
@@ -46,7 +47,7 @@ bool run_mcts_simulation(
 
   auto leaf_node = search_path.back();
   auto old_visited_value = leaf_node->visited.exchange(true, std::memory_order_seq_cst);
-  if (old_visited_value) return false;
+  if (old_visited_value) return SimulationStatus::retry;
   
   // Apply virtual loss
   for (auto node : search_path) {
@@ -105,6 +106,7 @@ bool run_mcts_simulation(
   for (int i = 0; i < State::value_support_count; ++i) {
     value += inference_result->value[i] * i / (State::value_support_count - 1);
   }
+  leaf_node->init_action_value = value;
 
   // Apply innverse dihedral transform
   auto priors = leaf_node->state->invert_symmetric_transform(inference_result->priors, symmetry_idx);
@@ -142,7 +144,7 @@ bool run_mcts_simulation(
   }
   leaf_node->evaluated.store(true, std::memory_order_release);
 
-  return true;
+  return SimulationStatus::success;
 }
 
 }

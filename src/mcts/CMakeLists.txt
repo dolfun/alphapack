@@ -23,6 +23,8 @@ add_library(
   generate_episode.cc
   training_sample.h
   training_sample.cc
+  tree_statistics.h
+  tree_statistics.cc
 )
 
 target_compile_features(mcts PRIVATE cxx_std_23)

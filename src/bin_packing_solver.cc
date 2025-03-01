@@ -104,23 +104,62 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly("image_data", &InferInput::image_data)
     .def_readonly("additional_data", &InferInput::additional_data);
 
+  // Tree Statistics
+  using mcts::TreeStatistics;
+  py::class_<TreeStatistics>(m, "TreeStatistics")
+    .def_readonly("success_count", &TreeStatistics::success_count)
+    .def_readonly("terminal_count", &TreeStatistics::terminal_count)
+    .def_readonly("retry_count", &TreeStatistics::retry_count)
+    .def_readonly("init_q_values", &TreeStatistics::init_q_values)
+    .def_readonly("final_q_values", &TreeStatistics::final_q_values)
+    .def_readonly("depths", &TreeStatistics::depths)
+    .def(py::pickle(
+      [] (const TreeStatistics& stats) {
+        return py::make_tuple(
+          stats.success_count,
+          stats.terminal_count,
+          stats.retry_count,
+          stats.init_q_values,
+          stats.final_q_values,
+          stats.depths
+        );
+      }, [] (py::tuple t) {
+        TreeStatistics stats {
+          .success_count     = t[0].cast<int>(),
+          .terminal_count    = t[1].cast<int>(),
+          .retry_count       = t[2].cast<int>(),
+          .init_q_values     = t[3].cast<std::array<float, State::action_count>>(),
+          .final_q_values    = t[4].cast<std::array<float, State::action_count>>(),
+          .depths            = t[5].cast<std::array<int, State::action_count>>(),
+        };
+        return stats;
+      }));
+
   // Evaluation
   using mcts::Evaluation;
   py::class_<Evaluation>(m, "Evaluation")
-    .def_readwrite("state", &Evaluation::state)
-    .def_readwrite("action_idx", &Evaluation::action_idx)
-    .def_readwrite("priors", &Evaluation::priors)
-    .def_readwrite("value", &Evaluation::value)
+    .def_readonly("state", &Evaluation::state)
+    .def_readonly("action_idx", &Evaluation::action_idx)
+    .def_readonly("priors", &Evaluation::priors)
+    .def_readonly("value", &Evaluation::value)
+    .def_readonly("tree_statistics", &Evaluation::tree_statistics)
     .def(py::pickle(
       [] (const Evaluation& evaluation) {
-        return py::make_tuple(evaluation.state, evaluation.action_idx, evaluation.priors, evaluation.value);
+        return py::make_tuple(
+          evaluation.state,
+          evaluation.action_idx,
+          evaluation.priors,
+          evaluation.value,
+          evaluation.tree_statistics
+        );
       },
       [] (py::tuple t) {
         Evaluation evaluation {
           t[0].cast<State>(),
           t[1].cast<int>(),
-          t[2].cast<std::vector<float>>(),
-          t[3].cast<float>()
+          t[2].cast<std::array<float, State::action_count>>(),
+          t[3].cast<float>(),
+          t[4].cast<TreeStatistics>()
         };
         return evaluation;
       }

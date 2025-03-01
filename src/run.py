@@ -78,7 +78,7 @@ def main():
     batch_size=64,
     c_puct=1.25,
     virtual_loss=1,
-    alpha=0.3
+    alpha=0.1
   )
 
   # Create model if does not exist

@@ -11,7 +11,7 @@ struct Node {
   std::shared_ptr<State> state;
 
   int action_idx{-1};
-  float prior{}, reward{};
+  float prior{}, reward{}, init_action_value{};
   std::weak_ptr<Node> prev_node;
 
   std::atomic<bool> visited{}, evaluated{};
@@ -23,7 +23,11 @@ struct Node {
 };
 using NodePtr = Node::Ptr;
 
-bool run_mcts_simulation(
+enum class SimulationStatus {
+  success, terminal, retry
+};
+
+SimulationStatus run_mcts_simulation(
   NodePtr root,
   float c_puct,
   int virtual_loss,
