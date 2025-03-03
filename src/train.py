@@ -32,8 +32,8 @@ def train_policy_value_network(model, episodes, device):
   print(f'{len(experience_replay)} samples loaded!')
 
   epochs = 8
-  lr = 1e-2
-  weight_decay = 1e-4
+  lr = 1e-3
+  weight_decay = 1e-2
 
   model.train()
   optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)

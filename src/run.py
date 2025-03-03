@@ -75,7 +75,7 @@ def main():
     move_threshold=0,
     simulations_per_move=512,
     mcts_thread_count=8,
-    batch_size=64,
+    batch_size=128,
     c_puct=1.25,
     virtual_loss=1,
     alpha=0.1
