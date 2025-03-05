@@ -20,7 +20,7 @@ def load_episodes(file):
       break
   return episodes
 
-def init_worker(_init_states, _config, _model_path, _device):
+def init_worker(_init_states, _config, _checkpoint_path, _device):
   global init_states, config, model, device
 
   init_states = _init_states
@@ -28,7 +28,8 @@ def init_worker(_init_states, _config, _model_path, _device):
   device = _device
 
   model = PolicyValueNetwork().to(device)
-  model.load_state_dict(torch.load(_model_path, weights_only=False))
+  checkpoint = torch.load(_checkpoint_path, weights_only=False)
+  model.load_state_dict(checkpoint['model'])
   model = torch.jit.script(model)
   model.eval()
 
@@ -63,9 +64,9 @@ def generate_episodes_wrapper(episodes_count):
 
   return episodes
 
-def generate_episodes(init_states, config, model_path, device):
+def generate_episodes(init_states, config, checkpoint_path, device):
   file = tempfile.TemporaryFile()
-  initargs = (init_states, config, model_path, device)
+  initargs = (init_states, config, checkpoint_path, device)
   with mp.Pool(config.processes, initializer=init_worker, initargs=initargs) as pool:
     steps_count = (config.episodes_per_iteration + config.step_size - 1) // config.step_size
     args = [config.step_size for _ in range(steps_count)]
@@ -81,4 +82,4 @@ def generate_episodes(init_states, config, model_path, device):
   move_count = np.array([len(episode) for episode in episodes])
   print(f'{move_count.sum()} moves played! ({move_count.mean():.1f} ± {move_count.std():.1f} moves per game)')
 
-  return episodes
+  return episodes, packing_efficiency.mean()

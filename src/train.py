@@ -25,20 +25,16 @@ class ExperienceReplay(Dataset):
     return self.samples[idx]
 
 step_count = 0
-def train_policy_value_network(model, episodes, device):
+def train_policy_value_network(model, episodes, device, config):
   samples = prepare_samples(episodes)
   experience_replay = ExperienceReplay(samples)
   dataloader = DataLoader(experience_replay, batch_size=2048, shuffle=True)
   print(f'{len(experience_replay)} samples loaded!')
 
-  epochs = 8
-  lr = 1e-3
-  weight_decay = 1e-2
-
   model.train()
-  optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+  optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
   train_log_file = open('train_log.csv', 'a')
-  for epoch in range(epochs):
+  for epoch in range(config.epochs):
     epoch_loss = 0.0
     epoch_priors_loss = 0.0
     epoch_value_loss = 0.0
@@ -69,5 +65,5 @@ def train_policy_value_network(model, episodes, device):
     epoch_loss /= len(dataloader)
     epoch_priors_loss /= len(dataloader)
     epoch_value_loss /= len(dataloader)
-    print(f'Epoch [{epoch+1:2}/{epochs}] -> ', end='')
+    print(f'Epoch [{epoch+1:2}/{config.epochs}] -> ', end='')
     print(f'Loss: {epoch_loss:.4f} = {epoch_priors_loss:.4f} + {epoch_value_loss:.4f}')
