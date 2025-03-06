@@ -16,19 +16,13 @@ class Config:
   virtual_loss: int
   alpha: float
 
-@dataclass
-class TrainConfig:
-  epochs: int
-  lr: float
-  weight_decay: float
-
 def get_config(iter):
   config = Config(
     seed=1233232,
     pool_size=256,
-    episodes_per_iteration=1152,
+    episodes_per_iteration=768,
     processes=6,
-    step_size=96,
+    step_size=64,
     workers_per_process=32,
     move_threshold=0,
     simulations_per_move=512,
@@ -40,22 +34,29 @@ def get_config(iter):
   )
 
   if iter < 0:
+    config.simulations_per_move = 512
     config.alpha = -1
     return config
 
-  if iter <= 8:
-    config.simulations_per_move = 512
-  elif iter <= 16:
-    config.simulations_per_move = 1024
+  if iter <= 4:
+    config.simulations_per_move = 400
+  elif iter <= 12:
+    config.simulations_per_move = 800
   else:
-    config.simulations_per_move = 2048
+    config.simulations_per_move = 1600
 
   return config
 
+@dataclass
+class TrainConfig:
+  epochs: int
+  lr: float
+  weight_decay: float
+
 def get_train_config(_):
   config = TrainConfig(
-    epochs=8,
-    lr=1e-3,
+    epochs=4,
+    lr=4e-3,
     weight_decay=1e-2
   )
 
