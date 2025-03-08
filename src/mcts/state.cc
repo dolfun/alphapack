@@ -141,7 +141,7 @@ float State::transition(int action_idx) {
     used_items_count += static_cast<int>(item.placed);
   }
 
-  int reward_scaling = item_count * (item_count) / 2;
+  int reward_scaling = item_count * (item_count + 1) / 2;
   float reward = static_cast<float>(used_items_count) / reward_scaling;
   return reward;
 }

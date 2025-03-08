@@ -17,9 +17,9 @@ auto prepare_sample(const mcts::Evaluation& evaluation, int k) -> TrainingSample
   TrainingSample sample{};
   sample.input = *evaluation.state.inference_input(k);
 
-  Item current_item = evaluation.state.items().front();
-  if (!current_item.placed) {
-    int l = current_item.shape.x, w = current_item.shape.y;
+  Item item = evaluation.state.items().front();
+  if (!item.placed) {
+    int l = item.shape.x, w = item.shape.y;
     constexpr int L = State::bin_length;
     for (int x = 0; x <= L - l; ++x) {
       for (int y = 0; y <= L - w; ++y) {

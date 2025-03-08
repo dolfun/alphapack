@@ -1,8 +1,8 @@
-from bin_packing_solver import generate_cut_init_states
+from bin_packing_solver import generate_cut_init_states, generate_random_init_states
 from policy_value_network import PolicyValueNetwork
+from config import get_config, get_train_config
 from train import train_policy_value_network
 from generate import generate_episodes
-from config import get_config, get_train_config
 
 import argparse
 import torch
@@ -21,7 +21,11 @@ def perform_iteration(checkpoint: dict, checkpoint_path: str, generate_only: boo
   print('SIMULATING GAMES:')
   checkpoint['iter'] += 1
   config = get_config(-1 if generate_only else checkpoint['iter'])
-  init_states = generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 1.0, 4096)
+  init_states = []
+  init_states += generate_random_init_states(config.seed, 1024, 2, 5)
+  # init_states += generate_cut_init_states(config.seed, config.pool_size, 3, 6, 0.0, 0.0, 1024)
+  # init_states += generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 0.75, 1024)
+
   episodes, packing_efficiency = generate_episodes(init_states, config, checkpoint_path, device)
   checkpoint['episodes'] = episodes
   checkpoint['packing_efficiency'] = packing_efficiency

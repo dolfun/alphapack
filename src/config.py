@@ -18,23 +18,26 @@ class Config:
 
 def get_config(iter):
   config = Config(
-    seed=1233232,
-    pool_size=256,
-    episodes_per_iteration=768,
+    seed=23894734,
+    pool_size=2048,
+    episodes_per_iteration=1152,
     processes=6,
-    step_size=64,
+    step_size=96,
     workers_per_process=32,
-    move_threshold=0,
+    move_threshold=4,
     simulations_per_move=512,
     mcts_thread_count=8,
     batch_size=128,
     c_puct=1.25,
     virtual_loss=1,
-    alpha=0.1
+    alpha=0.3
   )
 
   if iter < 0:
-    config.simulations_per_move = 512
+    config.episodes_per_iteration //= 2
+    config.step_size //= 2
+    config.simulations_per_move = 2048
+    config.move_threshold = 0
     config.alpha = -1
     return config
 
@@ -42,8 +45,10 @@ def get_config(iter):
     config.simulations_per_move = 400
   elif iter <= 12:
     config.simulations_per_move = 800
-  else:
+  elif iter <= 24:
     config.simulations_per_move = 1600
+  else:
+    config.simulations_per_move = 2400
 
   return config
 
