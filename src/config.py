@@ -42,13 +42,13 @@ def get_config(iter):
     return config
 
   if iter <= 4:
-    config.simulations_per_move = 400
+    config.simulations_per_move = 512
   elif iter <= 12:
-    config.simulations_per_move = 800
+    config.simulations_per_move = 1024
   elif iter <= 24:
-    config.simulations_per_move = 1600
+    config.simulations_per_move = 2048
   else:
-    config.simulations_per_move = 2400
+    config.simulations_per_move = 4096
 
   return config
 
@@ -58,11 +58,18 @@ class TrainConfig:
   lr: float
   weight_decay: float
 
-def get_train_config(_):
+def get_train_config(iter):
   config = TrainConfig(
     epochs=4,
     lr=4e-3,
     weight_decay=1e-2
   )
+
+  if iter <= 2:
+    config.lr = 1e-2
+  elif iter <= 4:
+    config.lr = 2e-3
+  else:
+    config.lr = 1e-3
 
   return config

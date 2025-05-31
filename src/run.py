@@ -9,23 +9,26 @@ import torch
 import os
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if device != 'cuda':
+if device.type != 'cuda':
   try:
     import torch_directml
     device = torch_directml.device()
   except ImportError:
     pass
 
+def get_init_states(config):
+  init_states = []
+  # init_states += generate_random_init_states(config.seed, 1024, 2, 5)
+  init_states += generate_cut_init_states(config.seed, config.pool_size, 3, 6, 0.0, 0.0, 1024)
+  # init_states += generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 0.75, 1024)
+  return init_states
+
 def perform_iteration(checkpoint: dict, checkpoint_path: str, generate_only: bool):
   # Simulate Games
   print('SIMULATING GAMES:')
   checkpoint['iter'] += 1
   config = get_config(-1 if generate_only else checkpoint['iter'])
-  init_states = []
-  init_states += generate_random_init_states(config.seed, 1024, 2, 5)
-  # init_states += generate_cut_init_states(config.seed, config.pool_size, 3, 6, 0.0, 0.0, 1024)
-  # init_states += generate_cut_init_states(config.seed, config.pool_size, 2, 5, 0.0, 0.75, 1024)
-
+  init_states = get_init_states(config)
   episodes, packing_efficiency = generate_episodes(init_states, config, checkpoint_path, device)
   checkpoint['episodes'] = episodes
   checkpoint['packing_efficiency'] = packing_efficiency
