@@ -1,11 +1,13 @@
 #include "generate_episode.h"
-#include "tree_statistics.h"
-#include "mcts.h"
+
+#include <atomic>
 #include <latch>
+#include <random>
 #include <ranges>
 #include <thread>
-#include <atomic>
-#include <random>
+
+#include "mcts.h"
+#include "tree_statistics.h"
 
 namespace mcts {
 
@@ -18,34 +20,21 @@ auto generate_episode(
   int virtual_loss,
   float alpha,
   InferenceQueue& inference_queue
-  ) -> std::vector<Evaluation> {
-
+) -> std::vector<Evaluation> {
   std::vector<Evaluation> episode;
   auto node = std::make_shared<Node>();
   node->state = std::make_shared<State>(state);
   while (true) {
     // Inject Dirichlet Noise in root node once
     if (alpha > 0.0f) {
-      run_mcts_simulation(
-        node,
-        c_puct,
-        virtual_loss,
-        alpha,
-        inference_queue
-      );
+      run_mcts_simulation(node, c_puct, virtual_loss, alpha, inference_queue);
     }
 
-    std::atomic<int> simulation_count{};
-    std::atomic<int> success_count{}, terminal_count{}, retry_count{};
+    std::atomic<int> simulation_count {};
+    std::atomic<int> success_count {}, terminal_count {}, retry_count {};
     auto task = [&] {
       while (simulation_count < simulations_per_move) {
-        auto status = run_mcts_simulation(
-          node,
-          c_puct,
-          virtual_loss,
-          -1.0f,
-          inference_queue
-        );
+        auto status = run_mcts_simulation(node, c_puct, virtual_loss, -1.0f, inference_queue);
 
         switch (status) {
           case SimulationStatus::success:
@@ -60,7 +49,7 @@ auto generate_episode(
 
           case SimulationStatus::retry:
             ++retry_count;
-            std::this_thread::sleep_for(std::chrono::microseconds(100)); // !?
+            std::this_thread::sleep_for(std::chrono::microseconds(100));  // !?
             break;
         };
       }
@@ -78,7 +67,7 @@ auto generate_episode(
 
     if (node->children.empty()) break;
 
-    std::array<float, State::action_count> priors{};
+    std::array<float, State::action_count> priors {};
     int max_visit_count = -1;
     std::vector<int> weights;
     weights.reserve(node->children.size());
@@ -94,7 +83,7 @@ auto generate_episode(
       }
     }
 
-    thread_local static std::random_device rd{};
+    thread_local static std::random_device rd {};
     thread_local static std::mt19937 engine { rd() };
     std::discrete_distribution<size_t> dist(weights.begin(), weights.end());
     NodePtr next_node = node->children[dist(engine)];
@@ -108,11 +97,23 @@ auto generate_episode(
     tree_statistics.terminal_count = terminal_count;
     tree_statistics.retry_count = retry_count;
 
-    episode.emplace_back(*node->state, next_node->action_idx, priors, next_node->reward, tree_statistics);
+    episode.emplace_back(
+      *node->state,
+      next_node->action_idx,
+      priors,
+      next_node->reward,
+      tree_statistics
+    );
     node = next_node;
   }
 
-  episode.emplace_back(*node->state, -1, std::array<float, State::action_count>{}, 0.0f, TreeStatistics{});
+  episode.emplace_back(
+    *node->state,
+    -1,
+    std::array<float, State::action_count> {},
+    0.0f,
+    TreeStatistics {}
+  );
 
   float cumulative_reward = 0.0f;
   for (auto& evaluation : std::views::reverse(episode)) {
@@ -135,13 +136,12 @@ auto generate_episodes(
   float alpha,
   int batch_size,
   InferenceQueue::InferFunc infer_func
-  ) -> std::vector<std::vector<Evaluation>> {
-
+) -> std::vector<std::vector<Evaluation>> {
   std::mutex episodes_mutex;
   std::vector<std::vector<Evaluation>> episodes;
   episodes.reserve(episodes_count);
 
-  std::random_device rd{};
+  std::random_device rd {};
   std::mt19937 engine { rd() };
   std::uniform_int_distribution<size_t> dist { 0, states.size() - 1 };
 
@@ -152,7 +152,7 @@ auto generate_episodes(
   };
 
   InferenceQueue inference_queue { static_cast<size_t>(batch_size), infer_func };
-  std::atomic<int> work_done{}, threads_finished{};
+  std::atomic<int> work_done {}, threads_finished {};
   std::latch latch { worker_count + 1 };
   auto worker = [&] {
     latch.arrive_and_wait();
@@ -195,4 +195,4 @@ auto generate_episodes(
   return episodes;
 }
 
-};
+};  // namespace mcts

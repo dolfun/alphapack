@@ -11,4 +11,4 @@ struct TreeStatistics {
 
 TreeStatistics compute_tree_statistics(NodePtr);
 
-};
+};  // namespace mcts

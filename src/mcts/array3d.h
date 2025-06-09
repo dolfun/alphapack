@@ -4,10 +4,12 @@
 template <typename T, size_t C, size_t N, size_t M>
 class Array3D {
 public:
-  Array3D(T val = {}) { m_data.fill(val); }
+  Array3D(T val = {}) {
+    m_data.fill(val);
+  }
 
   template <typename Self>
-  auto& operator[] (this Self&& self, size_t i, size_t j, size_t k) noexcept {
+  auto& operator[](this Self&& self, size_t i, size_t j, size_t k) noexcept {
     return self.m_data[i * N * M + j * M + k];
   }
 

@@ -1,9 +1,9 @@
 #include "generate_init_states.h"
+
 #include <random>
 
 auto generate_random_init_states(uint32_t seed, int pool_size, int min_item_dim, int max_item_dim)
-    -> std::vector<State> {
-
+  -> std::vector<State> {
   std::mt19937 engine { seed };
   std::vector<State> states;
   states.reserve(pool_size);
@@ -26,7 +26,8 @@ struct PlacedItem {
   Vec3i shape, pos;
 };
 
-auto generate_cut_item_sequence(std::mt19937& engine, int min_item_dim, int max_item_dim) -> std::vector<PlacedItem> {
+auto generate_cut_item_sequence(std::mt19937& engine, int min_item_dim, int max_item_dim)
+  -> std::vector<PlacedItem> {
   std::vector<PlacedItem> invalid_items, valid_items;
   invalid_items.emplace_back(
     Vec3i { State::bin_length, State::bin_length, State::bin_height },
@@ -55,11 +56,10 @@ auto generate_cut_item_sequence(std::mt19937& engine, int min_item_dim, int max_
     item2.shape[axis] = item.shape[axis] - split_point;
     item2.pos[axis] += split_point;
 
-    auto insert_item = [&] (PlacedItem item) {
-      bool is_valid =
-        item.shape.x >= min_item_dim && item.shape.x <= max_item_dim &&
-        item.shape.y >= min_item_dim && item.shape.y <= max_item_dim &&
-        item.shape.z >= min_item_dim && item.shape.z <= max_item_dim;
+    auto insert_item = [&](PlacedItem item) {
+      bool is_valid = item.shape.x >= min_item_dim && item.shape.x <= max_item_dim &&
+                      item.shape.y >= min_item_dim && item.shape.y <= max_item_dim &&
+                      item.shape.z >= min_item_dim && item.shape.z <= max_item_dim;
 
       if (is_valid) {
         valid_items.emplace_back(item);
@@ -72,7 +72,7 @@ auto generate_cut_item_sequence(std::mt19937& engine, int min_item_dim, int max_
     insert_item(item2);
   }
 
-  std::ranges::sort(valid_items, {}, [] (PlacedItem item) {
+  std::ranges::sort(valid_items, {}, [](PlacedItem item) {
     return std::make_tuple(item.pos.z, item.pos.x, item.pos.y);
   });
 
@@ -86,16 +86,15 @@ auto generate_cut_init_states(
   int max_item_dim,
   float min_packing_efficiency,
   float max_packing_efficiency,
-  int count)
-    -> std::vector<State> {
-
+  int count
+) -> std::vector<State> {
   std::mt19937 deterministic_engine { seed };
   std::vector<std::vector<PlacedItem>> items_pool(pool_size);
   std::ranges::generate(items_pool, [&] {
     return generate_cut_item_sequence(deterministic_engine, min_item_dim, max_item_dim);
   });
 
-  std::random_device rd{};
+  std::random_device rd {};
   std::mt19937 engine { rd() };
   std::uniform_int_distribution<int> idx_dist { 0, pool_size - 1 };
   std::uniform_real_distribution<float> pe_dist { min_packing_efficiency, max_packing_efficiency };

@@ -1,51 +1,44 @@
-#include <pybind11/pybind11.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include "mcts/generate_init_states.h"
+
 #include "mcts/generate_episode.h"
+#include "mcts/generate_init_states.h"
 #include "mcts/training_sample.h"
+
 namespace py = pybind11;
 
 template <typename T>
 py::buffer_info array_2d_buffer_info(State::Array2D<T>& arr) {
-  py::buffer_info info{};
+  py::buffer_info info {};
   info.ptr = static_cast<void*>(arr.data());
   info.itemsize = sizeof(T);
   info.format = py::format_descriptor<T>::format();
   info.ndim = 2;
 
-  info.shape = {
-    static_cast<long>(arr.template size<0>()),
-    static_cast<long>(arr.template size<1>())
-  };
+  info.shape = { static_cast<long>(arr.template size<0>()),
+                 static_cast<long>(arr.template size<1>()) };
 
-  info.strides = {
-    static_cast<long>(sizeof(T) * arr.template size<1>()),
-    sizeof(T)
-  };
+  info.strides = { static_cast<long>(sizeof(T) * arr.template size<1>()), sizeof(T) };
 
   return info;
 }
 
 template <typename T, size_t C>
 py::buffer_info array_3d_buffer_info(State::Array3D<T, C>& arr) {
-  py::buffer_info info{};
+  py::buffer_info info {};
   info.ptr = static_cast<void*>(arr.data());
   info.itemsize = sizeof(T);
   info.format = py::format_descriptor<T>::format();
   info.ndim = 3;
 
-  info.shape = {
-    static_cast<long>(arr.template size<0>()),
-    static_cast<long>(arr.template size<1>()),
-    static_cast<long>(arr.template size<2>())
-  };
+  info.shape = { static_cast<long>(arr.template size<0>()),
+                 static_cast<long>(arr.template size<1>()),
+                 static_cast<long>(arr.template size<2>()) };
 
-  info.strides = {
-    static_cast<long>(sizeof(T) * arr.template size<1>() * arr.template size<2>()),
-    static_cast<long>(sizeof(T) * arr.template size<2>()),
-    sizeof(T)
-  };
+  info.strides = { static_cast<long>(sizeof(T) * arr.template size<1>() * arr.template size<2>()),
+                   static_cast<long>(sizeof(T) * arr.template size<2>()),
+                   sizeof(T) };
 
   return info;
 }
@@ -69,7 +62,11 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_buffer(array_2d_buffer_info<int8_t>);
 
   // Array3D
-  py::class_<State::Array3D<float, State::input_feature_count>>(m, "ImageData", py::buffer_protocol())
+  py::class_<State::Array3D<float, State::input_feature_count>>(
+    m,
+    "ImageData",
+    py::buffer_protocol()
+  )
     .def_buffer(array_3d_buffer_info<float, State::input_feature_count>);
 
   // State
@@ -93,10 +90,12 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly_static("additional_input_count", &State::additional_input_count)
     .def_readonly_static("value_support_count", &State::value_support_count)
 
-    .def(py::pickle(
-      [] (const State& state) { return py::bytes(State::serialize(state)); },
-      [] (const py::bytes& bytes) { return State::unserialize(bytes); }
-    ));
+    .def(
+      py::pickle(
+        [](const State& state) { return py::bytes(State::serialize(state)); },
+        [](const py::bytes& bytes) { return State::unserialize(bytes); }
+      )
+    );
 
   // InferInput
   using InferInput = State::InferInput;
@@ -113,27 +112,31 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly("init_q_values", &TreeStatistics::init_q_values)
     .def_readonly("final_q_values", &TreeStatistics::final_q_values)
     .def_readonly("depths", &TreeStatistics::depths)
-    .def(py::pickle(
-      [] (const TreeStatistics& stats) {
-        return py::make_tuple(
-          stats.success_count,
-          stats.terminal_count,
-          stats.retry_count,
-          stats.init_q_values,
-          stats.final_q_values,
-          stats.depths
-        );
-      }, [] (py::tuple t) {
-        TreeStatistics stats {
-          .success_count     = t[0].cast<int>(),
-          .terminal_count    = t[1].cast<int>(),
-          .retry_count       = t[2].cast<int>(),
-          .init_q_values     = t[3].cast<std::array<float, State::action_count>>(),
-          .final_q_values    = t[4].cast<std::array<float, State::action_count>>(),
-          .depths            = t[5].cast<std::array<int, State::action_count>>(),
-        };
-        return stats;
-      }));
+    .def(
+      py::pickle(
+        [](const TreeStatistics& stats) {
+          return py::make_tuple(
+            stats.success_count,
+            stats.terminal_count,
+            stats.retry_count,
+            stats.init_q_values,
+            stats.final_q_values,
+            stats.depths
+          );
+        },
+        [](py::tuple t) {
+          TreeStatistics stats {
+            .success_count = t[0].cast<int>(),
+            .terminal_count = t[1].cast<int>(),
+            .retry_count = t[2].cast<int>(),
+            .init_q_values = t[3].cast<std::array<float, State::action_count>>(),
+            .final_q_values = t[4].cast<std::array<float, State::action_count>>(),
+            .depths = t[5].cast<std::array<int, State::action_count>>(),
+          };
+          return stats;
+        }
+      )
+    );
 
   // Evaluation
   using mcts::Evaluation;
@@ -143,27 +146,27 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly("priors", &Evaluation::priors)
     .def_readonly("value", &Evaluation::value)
     .def_readonly("tree_statistics", &Evaluation::tree_statistics)
-    .def(py::pickle(
-      [] (const Evaluation& evaluation) {
-        return py::make_tuple(
-          evaluation.state,
-          evaluation.action_idx,
-          evaluation.priors,
-          evaluation.value,
-          evaluation.tree_statistics
-        );
-      },
-      [] (py::tuple t) {
-        Evaluation evaluation {
-          t[0].cast<State>(),
-          t[1].cast<int>(),
-          t[2].cast<std::array<float, State::action_count>>(),
-          t[3].cast<float>(),
-          t[4].cast<TreeStatistics>()
-        };
-        return evaluation;
-      }
-    ));
+    .def(
+      py::pickle(
+        [](const Evaluation& evaluation) {
+          return py::make_tuple(
+            evaluation.state,
+            evaluation.action_idx,
+            evaluation.priors,
+            evaluation.value,
+            evaluation.tree_statistics
+          );
+        },
+        [](py::tuple t) {
+          Evaluation evaluation { t[0].cast<State>(),
+                                  t[1].cast<int>(),
+                                  t[2].cast<std::array<float, State::action_count>>(),
+                                  t[3].cast<float>(),
+                                  t[4].cast<TreeStatistics>() };
+          return evaluation;
+        }
+      )
+    );
 
   // generate_states
   m.def(
@@ -210,9 +213,5 @@ PYBIND11_MODULE(bin_packing_solver, m) {
     .def_readonly("priors", &TrainingSample::priors)
     .def_readonly("value", &TrainingSample::value);
 
-  m.def(
-    "prepare_samples", 
-    &prepare_training_samples,
-    py::arg("episodes")
-  );
+  m.def("prepare_samples", &prepare_training_samples, py::arg("episodes"));
 }

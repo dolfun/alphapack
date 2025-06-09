@@ -1,12 +1,14 @@
 #include "state.h"
-#include <cstring>
+
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 template <typename T, size_t N>
 class SingleUseMaxQueue {
 public:
-  constexpr SingleUseMaxQueue() : it_front { m_data.begin() }, it_back { m_data.begin() } {}
+  constexpr SingleUseMaxQueue() : it_front { m_data.begin() }, it_back { m_data.begin() } {
+  }
 
   constexpr T max() const noexcept {
     return *it_front;
@@ -32,9 +34,9 @@ private:
 
 template <typename T, size_t N, size_t M>
 auto get_max_in_window(const Array2D<T, N, M>& arr, int length, int width) -> State::Array2D<T> {
-  State::Array2D<T> res{};
+  State::Array2D<T> res {};
   for (size_t x = 0; x < N; ++x) {
-    SingleUseMaxQueue<T, M> max_queue{};
+    SingleUseMaxQueue<T, M> max_queue {};
     for (int y = 0; y < width; ++y) {
       max_queue.insert(arr[x, y]);
     }
@@ -49,7 +51,7 @@ auto get_max_in_window(const Array2D<T, N, M>& arr, int length, int width) -> St
   }
 
   for (size_t y = 0; y <= M - width; ++y) {
-    SingleUseMaxQueue<T, N> max_queue{};
+    SingleUseMaxQueue<T, N> max_queue {};
     for (int x = 0; x < length; ++x) {
       max_queue.insert(res[x, y]);
     }
@@ -69,7 +71,6 @@ auto get_max_in_window(const Array2D<T, N, M>& arr, int length, int width) -> St
 
 State::State(const std::vector<Item>& items)
     : m_feasibility_info { create_feasibility_info(items.front()) } {
-
   if (items.size() != item_count) {
     throw std::runtime_error("Invalid number of items received!");
   }
@@ -86,7 +87,7 @@ auto State::height_map() const noexcept -> const Array2D<int8_t>& {
 }
 
 auto State::feasibility_mask() const noexcept -> Array2D<int8_t> {
-  State::Array2D<int8_t> mask{};
+  State::Array2D<int8_t> mask {};
   for (size_t x = 0; x < mask.size<0>(); ++x) {
     for (size_t y = 0; y < mask.size<1>(); ++y) {
       mask[x, y] = (m_feasibility_info[x, y] >= 0);
@@ -168,14 +169,13 @@ auto State::serialize(const State& state) -> std::string {
 }
 
 State State::unserialize(const std::string& bytes) {
-  std::array<Item, item_count> items{};
-  Array2D<int8_t> height_map{}, feasibility_info{};
+  std::array<Item, item_count> items {};
+  Array2D<int8_t> height_map {}, feasibility_info {};
 
-  std::pair<void*, size_t> infos[3] = {
-    { items.data(), sizeof(Item) * item_count },
-    { height_map.data(), sizeof(int8_t) * height_map.size() },
-    { feasibility_info.data(), sizeof(int8_t) * feasibility_info.size() }
-  };
+  std::pair<void*, size_t> infos[3] = { { items.data(), sizeof(Item) * item_count },
+                                        { height_map.data(), sizeof(int8_t) * height_map.size() },
+                                        { feasibility_info.data(),
+                                          sizeof(int8_t) * feasibility_info.size() } };
 
   const char* src = &bytes[0];
   for (auto [dest, size] : infos) {
@@ -189,14 +189,13 @@ State State::unserialize(const std::string& bytes) {
 State::State(
   const std::array<Item, item_count>& items,
   const Array2D<int8_t>& height_map,
-  const Array2D<int8_t>& feasibility_info)
-  : m_items { items },
-    m_height_map { height_map },
-    m_feasibility_info { feasibility_info } {}
+  const Array2D<int8_t>& feasibility_info
+)
+    : m_items { items }, m_height_map { height_map }, m_feasibility_info { feasibility_info } {
+}
 
 auto State::get_additional_data(bool swap) const noexcept
-    -> std::array<float, additional_input_count> {
-
+  -> std::array<float, additional_input_count> {
   std::array<float, additional_input_count> data;
   auto it = data.begin();
   for (auto item : m_items) {
@@ -239,16 +238,17 @@ auto State::inference_input(int k) const noexcept -> std::shared_ptr<InferInput>
   return inference_input;
 };
 
-auto State::invert_symmetric_transform(const std::array<float, State::action_count>& priors, int k) const noexcept
-    -> std::array<float, State::action_count> {
-
+auto State::invert_symmetric_transform(
+  const std::array<float, State::action_count>& priors,
+  int k
+) const noexcept -> std::array<float, State::action_count> {
   Item current_item = m_items.front();
-  if (current_item.placed) return {}; // !?
+  if (current_item.placed) return {};  // !?
 
   constexpr int L = State::bin_length;
   int l = current_item.shape.x, w = current_item.shape.y;
 
-  std::array<float, State::action_count> inverted_priors{};
+  std::array<float, State::action_count> inverted_priors {};
   for (int x = 0; x <= L - l; ++x) {
     for (int y = 0; y <= L - w; ++y) {
       auto [x1, y1] = symmetric_transforms[k](x, y, l, w, L);

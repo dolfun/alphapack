@@ -16,9 +16,7 @@ auto InferenceQueue::infer(Input input) noexcept -> std::future<Result> {
 
 void InferenceQueue::run() noexcept {
   std::unique_lock lock { mutex };
-  cv.wait_for(lock, std::chrono::microseconds(100), [&] {
-    return queue.size() >= max_batch_size;
-  });
+  cv.wait_for(lock, std::chrono::microseconds(100), [&] { return queue.size() >= max_batch_size; });
   size_t batch_count = (queue.size() + max_batch_size - 1) / max_batch_size;
   lock.unlock();
 

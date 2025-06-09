@@ -3,11 +3,11 @@
 namespace mcts {
 
 void compute_tree_statistics_imp(
-    NodePtr node,
-    int action_idx,
-    TreeStatistics& stats,
-    int depth = 1) {
-
+  NodePtr node,
+  int action_idx,
+  TreeStatistics& stats,
+  int depth = 1
+) {
   if (node == nullptr) return;
 
   stats.depths[action_idx] = std::max(stats.depths[action_idx], depth);
@@ -18,7 +18,7 @@ void compute_tree_statistics_imp(
 }
 
 TreeStatistics compute_tree_statistics(NodePtr root) {
-  TreeStatistics stats{};
+  TreeStatistics stats {};
 
   for (auto child : root->children) {
     stats.init_q_values[child->action_idx] = child->init_action_value;
@@ -31,4 +31,4 @@ TreeStatistics compute_tree_statistics(NodePtr root) {
   return stats;
 }
 
-}
+}  // namespace mcts

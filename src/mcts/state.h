@@ -1,11 +1,12 @@
 #pragma once
-#include <vector>
-#include <string>
-#include <memory>
 #include <cstdint>
-#include "item.h"
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "array2d.h"
 #include "array3d.h"
+#include "item.h"
 
 class State {
 public:
@@ -18,14 +19,14 @@ public:
   static constexpr int value_support_count = 101;
 
   static constexpr std::pair<int, int> (*symmetric_transforms[8])(int, int, int, int, int) = {
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(x        , y        ); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, x        ); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, L - y - w); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(y        , L - x - l); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, y        ); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, L - x - l); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(x        , L - y - w); },
-    [] (int x, int y, int l, int w, int L) { return std::make_pair(y        , x        ); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(x, y); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, x); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, L - y - w); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(y, L - x - l); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(L - x - l, y); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(L - y - w, L - x - l); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(x, L - y - w); },
+    [](int x, int y, int l, int w, int L) { return std::make_pair(y, x); },
   };
 
   template <typename T>

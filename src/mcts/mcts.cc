@@ -1,18 +1,19 @@
 #include "mcts.h"
+
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <ranges>
-#include <algorithm>
 
 namespace mcts {
 
 SimulationStatus run_mcts_simulation(
-    NodePtr root,
-    float c_puct,
-    int virtual_loss,
-    float alpha,
-    InferenceQueue& inference_queue) {
-
+  NodePtr root,
+  float c_puct,
+  int virtual_loss,
+  float alpha,
+  InferenceQueue& inference_queue
+) {
   // Selection
   std::vector<NodePtr> search_path { root };
   while (true) {
@@ -31,8 +32,9 @@ SimulationStatus run_mcts_simulation(
       return SimulationStatus::terminal;
     }
 
-    float sqrt_parent_visit_count = std::sqrt(current_node->visit_count.load(std::memory_order_relaxed));
-    auto calculate_ucb_score = [c_puct, sqrt_parent_visit_count] (NodePtr child) {
+    float sqrt_parent_visit_count =
+      std::sqrt(current_node->visit_count.load(std::memory_order_relaxed));
+    auto calculate_ucb_score = [c_puct, sqrt_parent_visit_count](NodePtr child) {
       int visit_count = child->visit_count.load(std::memory_order_relaxed);
       float total_action_value = child->total_action_value.load(std::memory_order_relaxed);
 
@@ -48,7 +50,7 @@ SimulationStatus run_mcts_simulation(
   auto leaf_node = search_path.back();
   auto old_visited_value = leaf_node->visited.exchange(true, std::memory_order_seq_cst);
   if (old_visited_value) return SimulationStatus::retry;
-  
+
   // Apply virtual loss
   for (auto node : search_path) {
     node->visit_count.fetch_add(virtual_loss, std::memory_order_relaxed);
@@ -63,7 +65,7 @@ SimulationStatus run_mcts_simulation(
   }
 
   // Enqueue for async evaluation
-  thread_local static std::random_device rd{};
+  thread_local static std::random_device rd {};
   thread_local static std::mt19937 engine { rd() };
   thread_local static std::uniform_int_distribution<int> symmetry_dist(0, 7);
 
@@ -85,7 +87,7 @@ SimulationStatus run_mcts_simulation(
   auto inference_result = inference_result_future.get();
 
   // Applying softmax
-  auto apply_softmax = [] (auto& arr) {
+  auto apply_softmax = [](auto& arr) {
     float sum = 0.0f;
     float max_val = *std::ranges::max_element(arr);
     for (auto& val : arr) {
@@ -109,7 +111,8 @@ SimulationStatus run_mcts_simulation(
   leaf_node->init_action_value = value;
 
   // Apply innverse dihedral transform
-  auto priors = leaf_node->state->invert_symmetric_transform(inference_result->priors, symmetry_idx);
+  auto priors =
+    leaf_node->state->invert_symmetric_transform(inference_result->priors, symmetry_idx);
 
   float total_valid_prior = 0.0f;
   for (auto action_idx : actions) {
@@ -147,4 +150,4 @@ SimulationStatus run_mcts_simulation(
   return SimulationStatus::success;
 }
 
-}
+}  // namespace mcts

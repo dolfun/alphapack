@@ -12,4 +12,4 @@ struct Evaluation {
   TreeStatistics tree_statistics;
 };
 
-}
+}  // namespace mcts

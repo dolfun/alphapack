@@ -14,7 +14,7 @@ void fix_zeros(auto& arr) {
 }
 
 auto prepare_sample(const mcts::Evaluation& evaluation, int k) -> TrainingSample {
-  TrainingSample sample{};
+  TrainingSample sample {};
   sample.input = *evaluation.state.inference_input(k);
 
   Item item = evaluation.state.items().front();
@@ -47,7 +47,6 @@ auto prepare_sample(const mcts::Evaluation& evaluation, int k) -> TrainingSample
 
 auto prepare_training_samples(const std::vector<std::vector<mcts::Evaluation>>& episodes)
   -> std::vector<TrainingSample> {
-
   std::vector<TrainingSample> samples;
   for (const auto& episode : episodes) {
     for (const auto& evaluation : episode) {
